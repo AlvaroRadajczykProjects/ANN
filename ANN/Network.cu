@@ -105,16 +105,20 @@ void Network::initForward(int max_num_input_examples_expected) {
 	cudaMemcpy(d_input_pointers, hd_input_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
 	delete hd_input_pointers;
 	
-	cudaMalloc(&d_auxiliar_expand_reduce_matrix, max_num_input_examples_expected * sizeof(float));
-	float* h_auxiliar_expand_reduce_matrix = new float[max_num_input_examples_expected];
-	for (int i = 0; i < max_num_input_examples_expected; i++) { h_auxiliar_expand_reduce_matrix[i] = 1.0f; }
-	cudaMemcpy(d_auxiliar_expand_reduce_matrix, h_auxiliar_expand_reduce_matrix, max_num_input_examples_expected * sizeof(float), cudaMemcpyHostToDevice);
+	int tam = max(max_input_number_examples, number_networks);
+	cudaMalloc(&d_auxiliar_expand_reduce_matrix, tam * sizeof(float));
+	float* h_auxiliar_expand_reduce_matrix = new float[tam];
+	for (int i = 0; i < tam; i++) { h_auxiliar_expand_reduce_matrix[i] = 1.0f; }
+	cudaMemcpy(d_auxiliar_expand_reduce_matrix, h_auxiliar_expand_reduce_matrix, tam * sizeof(float), cudaMemcpyHostToDevice);
 	delete h_auxiliar_expand_reduce_matrix;
 	for (int i = 0; i < number_layers; i++) {
 		layers[i]->setNumberInputExamples(max_input_number_examples);
 		layers[i]->setAuxiliarExpandReduceMatrix(d_auxiliar_expand_reduce_matrix);
 		layers[i]->allocForwardMemory();
 	}
+
+	cudaMalloc(&d_output_forward_multiple_nn_sum, nextFourMultiple(max_input_number_examples * output_size) * sizeof(float));
+
 	cudaDeviceSynchronize();
 }
 
@@ -126,6 +130,21 @@ const void Network::forward(int num_examples, float* input_data, float* output_p
 		for (int i = 1; i < number_layers; i++) {
 			layers[i]->forward(stream_principal, layers[i-1]);
 		}
+
+		if (number_networks == 1) {
+			cudaMemcpyAsync(h_pinned_output_matrix, layers[number_layers-1]->getDeviceForward(), num_examples * output_size * sizeof(float), cudaMemcpyDeviceToHost, stream_principal);
+			cudaMemcpyAsync(output_pointer_dest, h_pinned_output_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
+		} else {
+			if (max_input_number_examples == 1) {
+				productoMatricesDevice(handle, d_auxiliar_expand_reduce_matrix, layers[number_layers - 1]->getDeviceForward(), d_output_forward_multiple_nn_sum, 1, number_networks, output_size);
+				multiplyAllElementsByConstant << < (int)ceil(nextFourMultiple(num_examples * output_size) /(float)(max_num_threads*4)), min(max_num_threads, nextFourMultiple(num_examples * output_size) / 4), 0, stream_principal >> > (d_output_forward_multiple_nn_sum, 1 / (float)number_networks);
+				cudaMemcpyAsync(h_pinned_output_matrix, d_output_forward_multiple_nn_sum, num_examples * output_size * sizeof(float), cudaMemcpyDeviceToHost, stream_principal);
+				cudaMemcpyAsync(output_pointer_dest, h_pinned_output_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
+			} else {
+				//habrá que hacer el sumatorio de todas las matrices al de todas las redes, y multiplicarles 1/numero_redes
+			}
+		}
+
 		cudaStreamSynchronize(stream_principal);
 	} else {
 		printf("\nCannot make forward, more examples than max number of examples defined in initForward");
@@ -162,5 +181,8 @@ void Network::finalizeForward() {
 		layers[i]->freeForwardMemory();
 	}
 	cudaFree(d_auxiliar_expand_reduce_matrix);
+
+	cudaFree(d_output_forward_multiple_nn_sum);
+
 	cudaDeviceSynchronize();
 }

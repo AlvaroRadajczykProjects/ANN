@@ -64,6 +64,7 @@ class Layer {
         void showForward();
 
         int getSize();
+        float* getDeviceForward();
         float** getDeviceForwardPointers();
 
         void setMaxNumThreads(int set);

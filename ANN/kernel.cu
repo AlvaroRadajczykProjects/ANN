@@ -1,17 +1,5 @@
 ﻿#include <stdio.h>
-
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-
-#include <cuda.h>
-#include <cuda_pipeline.h>
-#include <cuda_runtime.h>
-
-#include <curand.h>
-#include <curand_kernel.h>
-
-#include <iostream>
-#include <cassert>
+#include <chrono>
 
 #include "Network.cuh"
 
@@ -70,20 +58,49 @@ int main() {
 
     float* res = new float[4];
 
-    n->initForward(4);
+    n->initForward(1);
 
     n->showAuxiliarExpandReduceMatrices();
-    
 
-    n->forward(4, new float[2 * 4] { 0, 0, 0, 1, 1, 0, 1, 1 }, res);
+    n->forward(1, new float[2 * 1] { 0, 0 }, res);
 
     n->showForwardMatrices();
+
+    imprimirMatrizPorPantalla("Resultado forward host: ", res, 1, 1);
 
     n->finalizeForward();
 
     delete n;
 
-    //Layer* l = new Layer(3, ELU, dELU);
+    /*
+    Network* n = new Network(256, 2, 3, new Layer * [3] {
+        new Layer(256, ELU, dELU),
+        new Layer(256, ELU, dELU),
+        new Layer(256, Linear, dLinear)
+    });
+
+    float* inp = new float[256];
+    float* res = new float[256];
+
+    n->initForward(1);
+
+    std::chrono::time_point<std::chrono::system_clock> startCPU, endCPU;
+
+    startCPU = std::chrono::system_clock::now();
+
+    n->forward(1, inp, res);
+
+    endCPU = std::chrono::system_clock::now();
+
+    std::chrono::duration<double> elapsed_seconds = endCPU - startCPU;
+    std::time_t end_time = std::chrono::system_clock::to_time_t(endCPU);
+
+    std::cout << "elapsed time: " << elapsed_seconds.count() << "s; " << elapsed_seconds.count() * 1000 << "ms\n";
+
+    n->finalizeForward();
+
+    delete n;
+    */
 
     return 0;
 }

@@ -23,6 +23,7 @@ class Network {
         float* h_pinned_output_matrix;
         float* d_pinned_input_output_auxiliar_matrix;
         float* d_auxiliar_expand_reduce_matrix;
+        float* d_output_forward_multiple_nn_sum;
         float** d_input_pointers = 0;
 
         cublasHandle_t handle;
