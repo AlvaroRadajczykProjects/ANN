@@ -28,4 +28,6 @@ const void productoMatricesDevice(cublasHandle_t handle, const float* a, const f
 
 const void productoMatricesBatchDevice(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr);
 
+const void productoMatricesBatchDeviceSumC(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr);
+
 __global__ void applyFunctionVectorial(float* arr, func_t func);

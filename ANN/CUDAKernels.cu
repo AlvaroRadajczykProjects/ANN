@@ -15,6 +15,10 @@ const void productoMatricesBatchDevice(cublasHandle_t handle, float** a, float**
     cublasSgemmBatched_64(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, b, n, a, k, &beta_nosum, c, n, num_matr);
 }
 
+const void productoMatricesBatchDeviceSumC(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr) {
+    cublasSgemmBatched_64(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, b, n, a, k, &beta_sum, c, n, num_matr);
+}
+
 __global__ void applyFunctionVectorial(float* arr, func_t func) {
     //https://forums.developer.nvidia.com/t/the-float-and-float4-types-in-cuda/65061
     float4 val = reinterpret_cast<float4*>(arr)[blockIdx.x * blockDim.x + threadIdx.x];

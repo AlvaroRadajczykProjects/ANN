@@ -6,6 +6,10 @@
 
 class Layer {
     private:
+        int max_num_threads;
+        int num_blocks_needed_apply_function;
+        int num_threads_needed_apply_function;
+
         int input_size = 0;
         int size = 0;
         int number_networks = 0;
@@ -60,7 +64,9 @@ class Layer {
         void showForward();
 
         int getSize();
+        float** getDeviceForwardPointers();
 
+        void setMaxNumThreads(int set);
         void setInputSize(int is);
         void setNumberInputExamples(int set);
         void setAuxiliarExpandReduceMatrix(float* set);
@@ -69,8 +75,8 @@ class Layer {
         void setIsTraining(bool set);
         void setCublasHandle(cublasHandle_t* h);
 
-        void forward(float* d_input_values);
-        void forward(Layer* previous_layer);
+        void forward(cudaStream_t stream, float** d_input_pointers);
+        void forward(cudaStream_t stream, Layer* previous_layer);
 
         void allocWeightMatricesMemory();
         void freeWeightMatricesMemory();

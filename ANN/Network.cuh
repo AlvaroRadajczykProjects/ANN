@@ -5,6 +5,8 @@
 
 class Network {
     private:
+        int max_num_threads;
+
         int input_size;
         int max_input_number_examples;
         int output_size;
@@ -21,6 +23,7 @@ class Network {
         float* h_pinned_output_matrix;
         float* d_pinned_input_output_auxiliar_matrix;
         float* d_auxiliar_expand_reduce_matrix;
+        float** d_input_pointers = 0;
 
         cublasHandle_t handle;
 
