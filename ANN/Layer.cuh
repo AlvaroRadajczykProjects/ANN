@@ -12,6 +12,8 @@ class Layer {
         int number_input_examples = 0;
         bool is_training = false;
 
+        cublasHandle_t* handle;
+
         func_t activation_function = NULL;
         func_t activation_derivative_function = NULL;
         //func2_t each_output_sum = NULL;
@@ -41,9 +43,23 @@ class Layer {
     public:
         //dev_act_func and dev_act_der_func are __device__ float func(), need to be casted to (const void*)
         Layer( int sz, func_t dev_act_func, func_t dev_act_der_func );
-        //~Layer();
+        ~Layer();
+
+        void showInfo();
+        void showWeightBias();
 
         int getSize();
+
+        void setInputSize(int is);
+        void setNumberNetworks(int nn);
+        void setCublasHandle(cublasHandle_t* h);
+
+        void allocMemory();
+        void freeMemory();
+
+        void copyWeightBias( float* h_weight, float* h_bias );
+
+
         /*int getInputSize();
         
         int getNumberNetwors();
@@ -58,6 +74,7 @@ class Layer {
 
         void forward(float* d_input_values);
         void forward(Layer* previous_layer);
+        void copyForwardInHostPagedMemory(float* h_paged_mem_pointer);
 
         float obtainCostFunction();
 

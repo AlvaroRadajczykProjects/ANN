@@ -54,12 +54,28 @@ int main() {
     cudaGetSymbolAddress((void**)&d_func, d_dLinear);
     func_t dLinear = getDeviceSymbolInGlobalMemory(d_func);
 
-    Network* n = new Network(256, 1, 4, new Layer* [4]{
-        new Layer(5, ELU, dELU),
-        new Layer(10, ELU, dELU),
-        new Layer(5, ELU, dELU),
-        new Layer(2, Linear, dLinear)
+    Layer* l1 = new Layer(2, ELU, dELU);
+    Layer* l2 = new Layer(1, Linear, dLinear);
+
+    Network* n = new Network(2, 1, 2, new Layer* [2]{
+        l1,
+        l2
     });
+
+    l1->copyWeightBias(new float[4] {1, 2, 3, 4}, new float[2] {9, 8});
+    l2->copyWeightBias(new float[2] {3, 4}, new float[1] {9});
+
+    n->showInfoAboutNetwork();
+    n->showWeightsBiasesLayers();
+
+    float* res = new float[4];
+
+    n->initForward(4);
+    n->forward(4, new float[2 * 4] { 0, 0, 0, 1, 1, 0, 1, 1 }, res);
+    n->finalizeForward();
+
+    delete n;
+
     //Layer* l = new Layer(3, ELU, dELU);
 
     return 0;
