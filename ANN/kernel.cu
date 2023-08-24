@@ -1,11 +1,11 @@
-﻿
+﻿#include <stdio.h>
+
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
 #include <cuda.h>
 #include <cuda_pipeline.h>
 #include <cuda_runtime.h>
-#include <stdio.h>
 
 #include <curand.h>
 #include <curand_kernel.h>
@@ -73,9 +73,12 @@ int main() {
     n->initForward(4);
 
     n->showAuxiliarExpandReduceMatrices();
+    
+
+    n->forward(4, new float[2 * 4] { 0, 0, 0, 1, 1, 0, 1, 1 }, res);
+
     n->showForwardMatrices();
 
-    //n->forward(4, new float[2 * 4] { 0, 0, 0, 1, 1, 0, 1, 1 }, res);
     n->finalizeForward();
 
     delete n;

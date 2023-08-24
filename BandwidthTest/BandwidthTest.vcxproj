@@ -44,7 +44,7 @@
     <ExternalIncludePath>C:\Users\alvaro\source\repos\ANN\include</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <ExternalIncludePath>C:\Users\alvaro\source\repos\ANN\include</ExternalIncludePath>
+    <ExternalIncludePath>C:\Users\ALVARO\Documents\GitHub\ANN\include</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

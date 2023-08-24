@@ -74,7 +74,7 @@ void Layer::showAuxiliarExpandReduce() {
         float* h_auxiliar_expand_reduce_matrix = new float[number_input_examples];
         cudaMemcpy(h_auxiliar_expand_reduce_matrix, hd_expand_reduce_matrix_pointers[i], number_input_examples * sizeof(float), cudaMemcpyDeviceToHost);
         printf("\n\tNetwork %d:", i);
-        imprimirMatrizPorPantalla("\n\t\tauxiliar:", h_auxiliar_expand_reduce_matrix + (i * size), 1, size);
+        imprimirMatrizPorPantalla("\n\t\tauxiliar:", h_auxiliar_expand_reduce_matrix, 1, size);
         delete h_auxiliar_expand_reduce_matrix;
     }
 }
@@ -84,7 +84,7 @@ void Layer::showForward() {
         float* h_forward = new float[number_input_examples * size];
         cudaMemcpy(h_forward, hd_forward_pointers[i], number_input_examples * size * sizeof(float), cudaMemcpyDeviceToHost);
         printf("\n\tNetwork %d:", i);
-        imprimirMatrizPorPantalla("\n\t\tforward matrix:", h_forward + (i * number_input_examples * size), number_input_examples, size);
+        imprimirMatrizPorPantalla("\n\t\tforward matrix:", h_forward, number_input_examples, size);
         delete h_forward;
     }
 }
@@ -130,6 +130,14 @@ void Layer::setCublasHandle(cublasHandle_t* h) {
     handle = h;
 }
 
+void Layer::forward(float* d_input_values) {
+    productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_bias_vectors_pointers, d_forward_pointers, number_input_examples, 1, size, number_networks);
+}
+
+void Layer::forward(Layer* previous_layer) {
+    productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_bias_vectors_pointers, d_forward_pointers, number_input_examples, 1, size, number_networks);
+}
+
 void Layer::allocWeightMatricesMemory() {
     if (input_size > 0 && size > 0 && number_networks > 0) {
         cudaMalloc( &d_array_weight_matrix, input_size * size * number_networks * sizeof(float));
@@ -167,7 +175,10 @@ void Layer::allocForwardMemory() {
         hd_forward_pointers = new float* [number_networks];
         cudaMalloc(&d_forward_pointers, number_networks * sizeof(float*));
         for (int i = 0; i < number_networks; i++) {
-            hd_forward_pointers[i] = d_forward + i * (number_input_examples * size);
+            hd_forward_pointers[i] = d_forward + ( i * number_input_examples * size);
+            printf("\nNumber input examples: %d", number_input_examples);
+            printf("\nSize: %d", size);
+            printf("\nOffset forward: %p", d_forward + (i * number_input_examples * size));
         }
         cudaMemcpy(d_forward_pointers, hd_forward_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
     }

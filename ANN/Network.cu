@@ -89,6 +89,7 @@ void Network::initForward(int max_num_input_examples_expected) {
 	d_pinned_output_offset = input_size * max_input_number_examples;
 	cudaStreamCreate(&stream_principal);
 	cudaStreamCreate(&stream_transferencia_output);
+	cublasSetStream_v2(handle, stream_principal);
 	cudaHostAlloc(&h_pinned_input_matrix, input_size * max_input_number_examples * sizeof(float), cudaHostAllocWriteCombined);
 	cudaHostAlloc(&h_pinned_output_matrix, output_size * max_input_number_examples * sizeof(float), cudaHostAllocWriteCombined);
 	cudaMalloc(&d_pinned_input_output_auxiliar_matrix, max_input_number_examples * ( input_size + output_size) * sizeof(float));
@@ -110,6 +111,10 @@ const void Network::forward(int num_examples, float* input_data, float* output_p
 	if (num_examples <= max_input_number_examples) {
 		cudaMemcpyAsync(h_pinned_input_matrix, input_data, num_examples * input_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
 		cudaMemcpyAsync(d_pinned_input_output_auxiliar_matrix, h_pinned_input_matrix, num_examples * input_size * sizeof(float), cudaMemcpyHostToDevice, stream_principal);
+		layers[0]->forward(d_pinned_input_output_auxiliar_matrix);
+		for (int i = 1; i < number_layers; i++) {
+			layers[i]->forward(layers[i-1]);
+		}
 		cudaStreamSynchronize(stream_principal);
 	} else {
 		printf("\nCannot make forward, more examples than max number of examples defined in initForward");
@@ -132,6 +137,7 @@ const void Network::forwardTrain(int num_examples, float* input_data, float* out
 }
 
 void Network::finalizeForward() {
+	cublasSetStream_v2(handle, 0);
 	cudaStreamDestroy(stream_principal);
 	cudaStreamDestroy(stream_transferencia_output);
 	cudaFree(d_pinned_input_output_auxiliar_matrix);

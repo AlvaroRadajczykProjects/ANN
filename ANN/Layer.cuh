@@ -69,6 +69,9 @@ class Layer {
         void setIsTraining(bool set);
         void setCublasHandle(cublasHandle_t* h);
 
+        void forward(float* d_input_values);
+        void forward(Layer* previous_layer);
+
         void allocWeightMatricesMemory();
         void freeWeightMatricesMemory();
 

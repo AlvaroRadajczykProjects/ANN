@@ -26,7 +26,6 @@ class Network {
 
         /*func2_t loss_function = NULL;
         */
-        void forward(int num_examples, Layer* l);
 
     public:
         Network( int is, int nn, int nl, Layer** ls );
