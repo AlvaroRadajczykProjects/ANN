@@ -57,13 +57,13 @@ int main() {
     Layer* l1 = new Layer(2, ELU, dELU);
     Layer* l2 = new Layer(1, Linear, dLinear);
 
-    Network* n = new Network(2, 1, 2, new Layer* [2]{
+    Network* n = new Network(2, 2, 2, new Layer* [2]{
         l1,
         l2
     });
 
-    l1->copyWeightBias(new float[4] {1, 2, 3, 4}, new float[2] {9, 8});
-    l2->copyWeightBias(new float[2] {3, 4}, new float[1] {9});
+    l1->copyWeightBias(new float[8] {1, 2, 3, 4, 1, 2, 3, 4}, new float[4] {9, 8, 9, 8});
+    l2->copyWeightBias(new float[4] {3, 4, 3, 4}, new float[2] {9, 8});
 
     n->showInfoAboutNetwork();
     n->showWeightsBiasesLayers();
@@ -71,7 +71,11 @@ int main() {
     float* res = new float[4];
 
     n->initForward(4);
-    n->forward(4, new float[2 * 4] { 0, 0, 0, 1, 1, 0, 1, 1 }, res);
+
+    n->showAuxiliarExpandReduceMatrices();
+    n->showForwardMatrices();
+
+    //n->forward(4, new float[2 * 4] { 0, 0, 0, 1, 1, 0, 1, 1 }, res);
     n->finalizeForward();
 
     delete n;

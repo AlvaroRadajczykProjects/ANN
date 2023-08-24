@@ -20,6 +20,7 @@ class Network {
         float* h_pinned_input_matrix;
         float* h_pinned_output_matrix;
         float* d_pinned_input_output_auxiliar_matrix;
+        float* d_auxiliar_expand_reduce_matrix;
 
         cublasHandle_t handle;
 
@@ -33,14 +34,13 @@ class Network {
 
         void showInfoAboutNetwork();
         void showWeightsBiasesLayers();
+        void showAuxiliarExpandReduceMatrices();
+        void showForwardMatrices();
 
         void initForward( int max_num_input_examples_expected );
         const void forward( int num_examples, float* input_data, float* output_pointer_dest);
-        void finalizeForward();
-
-        void initForwardTrain(int max_num_input_examples_expected);
         const void forwardTrain(int num_examples, float* input_data, float* output_data);
-        void finalizeForwardTrain();
+        void finalizeForward();
 
         //void initBackwardADAM();
         //void finalizeBackwardADAM();

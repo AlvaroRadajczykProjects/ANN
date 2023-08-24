@@ -11,6 +11,7 @@ class Layer {
         int number_networks = 0;
         int number_input_examples = 0;
         bool is_training = false;
+        bool is_first_layer = false;
 
         cublasHandle_t* handle;
 
@@ -20,13 +21,21 @@ class Layer {
         //func2_t activation_function2 = NULL;
         //func2_t activation_derivative_function2 = NULL;
 
+        float* d_auxiliar_expand_reduce_matrix;
+        float** hd_expand_reduce_matrix_pointers;
+        float** d_expand_reduce_matrix_pointers;
+
         float* d_array_weight_matrix = NULL;
         float* d_array_bias_vector = NULL;
-        float** d_weight_matrices = NULL;
-        float** d_bias_vectors = NULL;
+        float** hd_weight_matrices_pointers = NULL;
+        float** hd_bias_vectors_pointers = NULL;
+        float** d_weight_matrices_pointers = NULL;
+        float** d_bias_vectors_pointers = NULL;
 
         //sólo hace falta al, este se puede deshacer vuelta a zl haciendo las operaciones opuestas al revés en la función de la derivada
         float* d_forward = NULL;
+        float** hd_forward_pointers = NULL;
+        float** d_forward_pointers = NULL;
 
         float* d_error_weight_matrix = NULL;
         float* d_error_bias_vector = NULL;
@@ -47,15 +56,24 @@ class Layer {
 
         void showInfo();
         void showWeightBias();
+        void showAuxiliarExpandReduce();
+        void showForward();
 
         int getSize();
 
         void setInputSize(int is);
+        void setNumberInputExamples(int set);
+        void setAuxiliarExpandReduceMatrix(float* set);
         void setNumberNetworks(int nn);
+        void setIsFirstLayer(bool set);
+        void setIsTraining(bool set);
         void setCublasHandle(cublasHandle_t* h);
 
-        void allocMemory();
-        void freeMemory();
+        void allocWeightMatricesMemory();
+        void freeWeightMatricesMemory();
+
+        void allocForwardMemory();
+        void freeForwardMemory();
 
         void copyWeightBias( float* h_weight, float* h_bias );
 
