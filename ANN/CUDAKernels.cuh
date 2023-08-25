@@ -34,4 +34,8 @@ const void productoMatricesBatchDeviceSumC(cublasHandle_t handle, float** a, flo
 
 __global__ void applyFunctionVectorial(float* arr, func_t func);
 
+__global__ void applyLossFunctionVectorial(float* pred, float* real, float* dst, func2_t func);
+
 __global__ void multiplyAllElementsByConstant(float* arr, float ct);
+
+__global__ void sumVectorsSameDimensions(float* dst, float* src);

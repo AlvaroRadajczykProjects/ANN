@@ -26,19 +26,44 @@ const void productoMatricesBatchDeviceSumC(cublasHandle_t handle, float** a, flo
 
 __global__ void applyFunctionVectorial(float* arr, func_t func) {
     //https://forums.developer.nvidia.com/t/the-float-and-float4-types-in-cuda/65061
-    float4 val = reinterpret_cast<float4*>(arr)[blockIdx.x * blockDim.x + threadIdx.x];
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    float4 val = reinterpret_cast<float4*>(arr)[idx];
     val.x = func(val.x);
     val.y = func(val.y);
     val.z = func(val.z);
     val.w = func(val.w);
-    reinterpret_cast<float4*>(arr)[blockIdx.x * blockDim.x + threadIdx.x] = val;
+    reinterpret_cast<float4*>(arr)[idx] = val;
+}
+
+__global__ void applyLossFunctionVectorial(float* pred, float* real, float* dst, func2_t func) {
+    //https://forums.developer.nvidia.com/t/the-float-and-float4-types-in-cuda/65061
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    float4 vpred = reinterpret_cast<float4*>(pred)[idx];
+    float4 vreal = reinterpret_cast<float4*>(real)[idx];
+    vpred.x = func(vpred.x, vreal.x);
+    vpred.y = func(vpred.y, vreal.y);
+    vpred.z = func(vpred.z, vreal.z);
+    vpred.w = func(vpred.w, vreal.w);
+    reinterpret_cast<float4*>(dst)[idx] = vpred;
 }
 
 __global__ void multiplyAllElementsByConstant(float* arr, float ct) {
-    float4 val = reinterpret_cast<float4*>(arr)[blockIdx.x * blockDim.x + threadIdx.x];
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    float4 val = reinterpret_cast<float4*>(arr)[idx];
     val.x = val.x * ct;
     val.y = val.y * ct;
     val.z = val.z * ct;
     val.w = val.w * ct;
-    reinterpret_cast<float4*>(arr)[blockIdx.x * blockDim.x + threadIdx.x] = val;
+    reinterpret_cast<float4*>(arr)[idx] = val;
+}
+
+__global__ void sumVectorsSameDimensions(float* dst, float* src) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    float4 val_src = reinterpret_cast<float4*>(src)[idx];
+    float4 val_dst = reinterpret_cast<float4*>(dst)[idx];
+    val_src.x = val_src.x + val_dst.x;
+    val_src.y = val_src.y + val_dst.y;
+    val_src.z = val_src.z + val_dst.z;
+    val_src.w = val_src.w + val_dst.w;
+    reinterpret_cast<float4*>(dst)[idx] = val_src;
 }

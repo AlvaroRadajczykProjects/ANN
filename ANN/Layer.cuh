@@ -41,9 +41,14 @@ class Layer {
         float** hd_forward_pointers = NULL;
         float** d_forward_pointers = NULL;
 
-        float* d_error_weight_matrix = NULL;
-        float* d_error_bias_vector = NULL;
+        float* d_error_array_weight_matrix = NULL;
+        float* d_error_array_bias_vector = NULL;
+        float** hd_error_weight_matrices_pointers = NULL;
+        float** hd_error_bias_vectors_pointers = NULL;
+        float** d_error_weight_matrices_pointers = NULL;
+        float** d_error_bias_vectors_pointers = NULL;
 
+        //esta será la matriz auxiliar para trasponer cualquier matriz que sea necesaria
         float* d_auxiliar_transpose_matrix = NULL;
         //será la matriz de device de tamaño max(nelems_entrada+nelems_salida, nelems_mayor_capa_salida)
         float* d_auxiliar_error_forward_layer = NULL;
@@ -76,14 +81,17 @@ class Layer {
         void setIsTraining(bool set);
         void setCublasHandle(cublasHandle_t* h);
 
-        void forward(cudaStream_t stream, float** d_input_pointers);
-        void forward(cudaStream_t stream, Layer* previous_layer);
+        void forward(cudaStream_t stream, float** d_input_pointers, int num_inputs);
+        void forward(cudaStream_t stream, Layer* previous_layer, int num_inputs);
 
         void allocWeightMatricesMemory();
         void freeWeightMatricesMemory();
 
         void allocForwardMemory();
         void freeForwardMemory();
+
+        void allocBackwardMemory(float* d_aux_transpose_matrix, float* d_aux_error_matrix);
+        void freeBackwardMemory();
 
         void copyWeightBias( float* h_weight, float* h_bias );
 
