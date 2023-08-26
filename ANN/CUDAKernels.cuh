@@ -36,6 +36,10 @@ __global__ void applyFunctionVectorial(float* arr, func_t func);
 
 __global__ void applyLossFunctionVectorial(float* pred, float* real, float* dst, func2_t func);
 
-__global__ void multiplyAllElementsByConstant(float* arr, float ct);
+__global__ void applyLossFunctionScalar(float* pred, float* real, float* dst, func2_t func);
+
+__global__ void multiplyAllElementsByConstantVectorial(float* arr, float ct);
+
+__global__ void multiplyAllElementsByConstantScalar(float* arr, float ct);
 
 __global__ void sumVectorsSameDimensions(float* dst, float* src);

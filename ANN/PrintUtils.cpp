@@ -3,7 +3,7 @@
 void imprimirVectorPorPantalla(char* texto_mostrar, float vector[], int inicio, int fin) {
     printf("\n%s [ ", texto_mostrar);
     for (int i = inicio; i < fin; i++) {
-        printf("%.12f", vector[i]);
+        printf("%.16f", vector[i]);
         if (i < fin - 1) { printf(","); }
         printf(" ");
     }

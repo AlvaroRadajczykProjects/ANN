@@ -136,7 +136,7 @@ void Network::initForwardTrain(int m_num_examples, int m_batch_size) {
 	cublasSetStream_v2(handle, stream_principal);
 	cudaHostAlloc(&h_pinned_input_matrix, input_size * max_input_number_examples * sizeof(float), cudaHostAllocWriteCombined);
 	cudaHostAlloc(&h_pinned_output_matrix, output_size * max_input_number_examples * sizeof(float), cudaHostAllocWriteCombined);
-	cudaMalloc(&d_pinned_input_output_auxiliar_matrix, max_input_number_examples * (input_size + output_size) * sizeof(float));
+	cudaMalloc(&d_pinned_input_output_auxiliar_matrix, ( d_pinned_output_offset + nextFourMultiple(max_input_number_examples * output_size) ) * sizeof(float));
 
 	float** hd_input_pointers = new float* [number_networks];
 	for (int i = 0; i < number_networks; i++) { hd_input_pointers[i] = d_pinned_input_output_auxiliar_matrix + 0; }
@@ -182,6 +182,8 @@ const void Network::copyInputOutputTrain(int num_examples, float* input_data, fl
 		cudaMemcpyAsync(h_pinned_output_matrix, output_data, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_transferencia_output);
 		cudaMemcpyAsync(d_pinned_input_output_auxiliar_matrix, h_pinned_input_matrix, num_examples * input_size * sizeof(float), cudaMemcpyHostToDevice, stream_principal);
 		cudaMemcpyAsync(d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset, h_pinned_output_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToDevice, stream_transferencia_output);
+		//cudaStreamSynchronize(stream_principal);
+		//cudaStreamSynchronize(stream_transferencia_output);
 		//para hacer el backward, esperaré a que ambas transferencias hayan terminado
 		/*
 		//input y output se copian bien, deberían de llegar a tiempo sin necesidad de sincronización
@@ -213,7 +215,7 @@ const void Network::forward(int num_examples, float* input_data, float* output_p
 		} else {
 			if (max_input_number_examples == 1) {
 				productoMatricesDevice(handle, d_auxiliar_expand_reduce_matrix, layers[number_layers - 1]->getDeviceForward(), d_output_forward_multiple_nn_sum, 1, number_networks, output_size);
-				multiplyAllElementsByConstant << < (int)ceil(nextFourMultiple(num_examples * output_size) /(float)(max_num_threads*4)), min(max_num_threads, nextFourMultiple(num_examples * output_size) / 4), 0, stream_principal >> > (d_output_forward_multiple_nn_sum, 1 / (float)number_networks);
+				multiplyAllElementsByConstantVectorial << < (int)ceil(nextFourMultiple(num_examples * output_size) /(float)(max_num_threads*4)), min(max_num_threads, nextFourMultiple(num_examples * output_size) / 4), 0, stream_principal >> > (d_output_forward_multiple_nn_sum, 1 / (float)number_networks);
 				cudaMemcpyAsync(h_pinned_output_matrix, d_output_forward_multiple_nn_sum, num_examples * output_size * sizeof(float), cudaMemcpyDeviceToHost, stream_principal);
 				cudaMemcpyAsync(output_pointer_dest, h_pinned_output_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
 			} else {
@@ -273,19 +275,108 @@ float Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, in
 			delete ptrs;
 
 			num_elems_batch = batch_size * output_size;
-			//apply loss function
+			
+			/*
+			float* matriz_Cost2 = new float[num_elems_batch];
 			for (int i = 0; i < number_networks; i++) {
-				applyLossFunctionVectorial << < (int)ceil(nextFourMultiple(num_elems_batch / 4)/(float)(max_num_threads)), min(max_num_threads, nextFourMultiple(num_elems_batch / 4)) >> > (
-					layers[number_layers-1]->getDeviceForward() + (i * num_elems_batch),
-					d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset + (batch_ids[i] * num_elems_batch), 
-					d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch),
-					loss_function
-				);
+				cudaMemcpy(matriz_Cost, layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch), num_elems_batch * sizeof(float), cudaMemcpyDeviceToHost);
+				imprimirMatrizPorPantalla("XD:", matriz_Cost, batch_size, output_size);
+				cudaMemcpy(matriz_Cost, d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset + (batch_ids[i] * num_elems_batch), num_elems_batch * sizeof(float), cudaMemcpyDeviceToHost);
+				imprimirMatrizPorPantalla("XD2:", matriz_Cost, batch_size, output_size);
+			}
+			delete matriz_Cost2;
+			*/
+
+			//apply cost function
+			int batch_offset = ((batch_size / 4) * 4) * output_size;
+
+			if (batch_offset > 0) {
+				for (int i = 0; i < number_networks; i++) {
+					applyLossFunctionVectorial << < (int) (batch_offset/4), min(max_num_threads, batch_offset/4), 0, stream_principal >> > (
+						layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch),
+						d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset + (batch_ids[i] * num_elems_batch),
+						d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch),
+						loss_function
+					);
+					//manageCUDAError(cudaDeviceSynchronize(), "");
+				}
 			}
 
-			float* matriz_Cost = new float[num_elems_batch*number_networks];
+			if (batch_size % 4 != 0) {
+				for (int i = 0; i < number_networks; i++) {
+					applyLossFunctionScalar << < 1, batch_size % 4, 0, stream_principal >> > (
+						layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch) + batch_offset,
+						d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset + (batch_ids[i] * num_elems_batch) + batch_offset,
+						d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch) + batch_offset,
+						loss_function
+					);
+					//manageCUDAError(cudaDeviceSynchronize(), "");
+				}
+			}
+
+			//obtain cost function
+			productoMatricesDevice(handle, d_auxiliar_expand_reduce_matrix, d_auxiliar_matrix_loss_function_error_backprop, d_output_forward_multiple_nn_sum, 1, batch_size*number_networks, output_size);
+			multiplyAllElementsByConstantVectorial <<< (int) ceil(output_size / 4), min(max_num_threads, (int)(output_size / 4) ), 0, stream_principal >> > (d_output_forward_multiple_nn_sum, 1 / (float)(batch_size * number_networks) );
+			if (output_size % 4 != 0) {
+				multiplyAllElementsByConstantScalar << < 1, output_size % 4, 0, stream_principal >> > (d_output_forward_multiple_nn_sum + ((output_size/4)*4), 1 / (float)(batch_size * number_networks));
+			}
+			float cost_function_result;
+			float* d_res = 0;
+			cudaMalloc(&d_res, sizeof(float));
+			productoMatricesDevice(handle, d_auxiliar_expand_reduce_matrix, d_output_forward_multiple_nn_sum, d_res, 1, output_size, 1);
+			cudaMemcpy(&cost_function_result, d_res, sizeof(float), cudaMemcpyDeviceToHost);
+			cost_function_result = cost_function_result / (float)output_size;
+			cudaFree(d_res);
+
+			/*
+			float* matriz_Cost = new float[num_elems_batch * number_networks];
 			cudaMemcpy(matriz_Cost, d_auxiliar_matrix_loss_function_error_backprop, num_elems_batch * number_networks * sizeof(float), cudaMemcpyDeviceToHost);
 			imprimirMatrizPorPantalla("Error de coste:", matriz_Cost, batch_size* number_networks, output_size);
+			delete matriz_Cost;
+			*/
+
+			/*
+			float* mirarCost = new float[output_size];
+			cudaMemcpy(mirarCost, d_output_forward_multiple_nn_sum, output_size * sizeof(float), cudaMemcpyDeviceToHost);
+			imprimirMatrizPorPantalla("Error de coste sum:", mirarCost, 1, output_size);
+			delete mirarCost;
+			*/
+
+			//apply loss function
+			batch_offset = ((batch_size / 4) * 4) * output_size;
+
+			if (batch_offset > 0) {
+				for (int i = 0; i < number_networks; i++) {
+					applyLossFunctionVectorial << < (int)(batch_offset / 4), min(max_num_threads, batch_offset / 4), 0, stream_principal >> > (
+						layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch),
+						d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset + (batch_ids[i] * num_elems_batch),
+						d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch),
+						derivative_loss_function
+					);
+					//manageCUDAError(cudaDeviceSynchronize(), "");
+				}
+			}
+
+			if (batch_size % 4 != 0) {
+				for (int i = 0; i < number_networks; i++) {
+					applyLossFunctionScalar << < 1, batch_size % 4, 0, stream_principal >> > (
+						layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch) + batch_offset,
+						d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset + (batch_ids[i] * num_elems_batch) + batch_offset,
+						d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch) + batch_offset,
+						derivative_loss_function
+					);
+					//manageCUDAError(cudaDeviceSynchronize(), "");
+				}
+			}
+
+			///*
+			float* matriz_Cost = new float[num_elems_batch * number_networks];
+			cudaMemcpy(matriz_Cost, d_auxiliar_matrix_loss_function_error_backprop, num_elems_batch * number_networks * sizeof(float), cudaMemcpyDeviceToHost);
+			imprimirMatrizPorPantalla("Loss function applied:", matriz_Cost, batch_size* number_networks, output_size);
+			delete matriz_Cost;
+			//*/
+
+			return cost_function_result;
 		}
 		else {
 			printf("\nwhen batch forwardTrain, num_examples % batch_size must be 0");

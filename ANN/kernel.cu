@@ -94,21 +94,23 @@ int main() {
     l1->copyWeightBias(new float[8] {1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509, 1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509}, new float[4] {-1.1172228848589787, 0.0, -1.1172228848589787, 0.0});
     l2->copyWeightBias(new float[4] {-1.9048641164238775, 1.2619510820705655, -1.9048641164238775, 1.2619510820705655}, new float[2] {-0.12816004082232135, -0.12816004082232135});
 
-    n->showWeightsBiasesLayers();
+    //n->showWeightsBiasesLayers();
 
-    float* input = new float[4*2] { 0, 0, 0, 1, 1, 0, 1, 1 };
-    float* output = new float[4*1] { 0, 1, 1, 0 };
+    float* input = new float[4*2*2] { 9, 9, 9, 9, 9, 9, 9, 9, 0, 0, 0, 1, 1, 0, 1, 1 };
+    float* output = new float[4*1*2] { 9, 9, 9, 9, 0, 1, 1, 0 };
 
-    n->initForwardTrain(4, 2);
+    n->initForwardTrain(8, 2);
 
-    n->showAuxiliarExpandReduceMatrices();
+    //n->showAuxiliarExpandReduceMatrices();
 
-    n->copyInputOutputTrain(4, input, output);
+    n->copyInputOutputTrain(8, input, output);
 
     //n->forwardTrain(2);
-    n->trainGetCostFunctionAndCalculateLossFunction(4, 2, new int[2]{1, 0});
+    float err = n->trainGetCostFunctionAndCalculateLossFunction(8, 2, new int[2]{2, 3});
 
-    n->showForwardMatrices();
+    printf("\n\nError MSE en host: %.16f\n", err);
+
+    //n->showForwardMatrices();
 
     n->finalizeForward();
 

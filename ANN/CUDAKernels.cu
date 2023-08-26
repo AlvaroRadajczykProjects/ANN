@@ -47,7 +47,13 @@ __global__ void applyLossFunctionVectorial(float* pred, float* real, float* dst,
     reinterpret_cast<float4*>(dst)[idx] = vpred;
 }
 
-__global__ void multiplyAllElementsByConstant(float* arr, float ct) {
+__global__ void applyLossFunctionScalar(float* pred, float* real, float* dst, func2_t func) {
+    //https://forums.developer.nvidia.com/t/the-float-and-float4-types-in-cuda/65061
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    dst[idx] = func(pred[idx], real[idx]);
+}
+
+__global__ void multiplyAllElementsByConstantVectorial(float* arr, float ct) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     float4 val = reinterpret_cast<float4*>(arr)[idx];
     val.x = val.x * ct;
@@ -55,6 +61,11 @@ __global__ void multiplyAllElementsByConstant(float* arr, float ct) {
     val.z = val.z * ct;
     val.w = val.w * ct;
     reinterpret_cast<float4*>(arr)[idx] = val;
+}
+
+__global__ void multiplyAllElementsByConstantScalar(float* arr, float ct) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    arr[idx] = arr[idx] * ct;
 }
 
 __global__ void sumVectorsSameDimensions(float* dst, float* src) {
