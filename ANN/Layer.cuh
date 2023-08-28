@@ -52,6 +52,7 @@ class Layer {
         float* d_auxiliar_transpose_matrix = NULL;
         //será la matriz de device de tamaño max(nelems_entrada+nelems_salida, nelems_mayor_capa_salida)
         float* d_auxiliar_error_forward_layer = NULL;
+        float** d_auxiliar_error_forward_layer_pointers = NULL;
 
         float* d_weight_matrix_momentum = NULL;
         float* d_bias_vector_momentum = NULL;
@@ -71,6 +72,8 @@ class Layer {
         int getSize();
         float* getDeviceForward();
         float** getDeviceForwardPointers();
+        float** getAuxiliarExpandReduceMatrixPointers();
+        float** getDeviceAuxiliarErrorForwardLayerPointers();
 
         void setMaxNumThreads(int set);
         void setInputSize(int is);
@@ -91,6 +94,7 @@ class Layer {
         void freeForwardMemory();
 
         void allocBackwardMemory(float* d_aux_transpose_matrix, float* d_aux_error_matrix);
+        void allocBackwardMemory(int batch_size, float* d_aux_transpose_matrix, float* d_aux_error_matrix);
         void freeBackwardMemory();
 
         void copyWeightBias( float* h_weight, float* h_bias );

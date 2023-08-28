@@ -32,6 +32,7 @@ class Network {
         //matrix of next four multiple of max_number_examples rows and output_size cols, when using more than one network, here the average of each network prediction is calculated
         //also is used for cost function summatory, perfectly fits in
         float* d_output_forward_multiple_nn_sum;
+        float** d_output_forward_multiple_nn_sum_pointers = NULL;
         //matrix where all temporal transposes are stored
         float* d_auxiliar_matrix_transpose = NULL;
         //matrix where changed-order output is copied and loss function is calculated, and also is stored backpropagated error of current layer
@@ -54,22 +55,32 @@ class Network {
         void showAuxiliarExpandReduceMatrices();
         void showForwardMatrices();
 
+        int getNumberNetwors();
+
         void initForward( int max_num_input_examples_expected );
         void initForwardTrain(int num_examples, int max_batch_size);
-        const void forward( int num_examples, float* input_data, float* output_pointer_dest);
+
         const void copyInputOutputTrain(int num_examples, float* input_data, float* output_data);
+
+        const void forward( int num_examples, float* input_data, float* output_pointer_dest);
+        
         const void forwardTrain(int num_examples);
         const void forwardTrain(int num_examples, int batch_size, float** d_input_pointers);
-        float trainGetCostFunctionAndCalculateLossFunction(int num_examples);
-        float trainGetCostFunctionAndCalculateLossFunction(int num_examples, int batch_size, int* batch_ids);
+
+        float* trainGetCostFunctionAndCalculateLossFunction(int num_examples);
+        float* trainGetCostFunctionAndCalculateLossFunction(int num_examples, int batch_size, int* batch_ids);
+
+        float* backwardPhaseSGD(int num_examples, int batch_size, int* batch_ids);
+
         void finalizeForward();
 
         //void initBackwardADAM();
         //void finalizeBackwardADAM();
 
+        
         /*int getInputSize();
         int getOutputSize();
-        int getNumberNetwors();
+        
         void changeIsTraining(bool new_training);
         float* getWeightMatrix();
         float* getBiasVector();*/
