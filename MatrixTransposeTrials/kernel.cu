@@ -19,155 +19,165 @@
 #include <chrono>
 #include <ctime>
 
-#define uS_PER_SEC 1000000
-#define uS_PER_mS 1000
-#define N 4096
-#define M 4096
-#define TILE_DIM 32
-#define BLOCK_ROWS 8
+#include <iostream>
+#include <cublas_v2.h>
 
-__global__ void transposeCoalesced(float* odata, const float* idata)
-{
-    __shared__ float tile[TILE_DIM][TILE_DIM + 1];
-
-    int x = blockIdx.x * TILE_DIM + threadIdx.x;
-    int y = blockIdx.y * TILE_DIM + threadIdx.y;
-    int width = gridDim.x * TILE_DIM;
-
-    for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
-        tile[threadIdx.y + j][threadIdx.x] = idata[(y + j) * width + x];
-
-    __syncthreads();
-
-    x = blockIdx.y * TILE_DIM + threadIdx.x;  // transpose block offset
-    y = blockIdx.x * TILE_DIM + threadIdx.y;
-
-    for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
-        odata[(y + j) * width + x] = tile[threadIdx.x][threadIdx.y + j];
+void imprimirVectorPorPantalla(char* texto_mostrar, float vector[], int inicio, int fin) {
+    printf("\n%s [ ", texto_mostrar);
+    for (int i = inicio; i < fin; i++) {
+        printf("%.20f", vector[i]);
+        if (i < fin - 1) { printf(","); }
+        printf(" ");
+    }
+    printf("]");
 }
 
-__global__ void iptransposeCoalesced(float* data)
-{
-    __shared__ float tile_s[TILE_DIM][TILE_DIM + 1];
-    __shared__ float tile_d[TILE_DIM][TILE_DIM + 1];
-
-    int x = blockIdx.x * TILE_DIM + threadIdx.x;
-    int y = blockIdx.y * TILE_DIM + threadIdx.y;
-    int width = gridDim.x * TILE_DIM;
-
-    if (blockIdx.y > blockIdx.x) { // handle off-diagonal case
-        int dx = blockIdx.y * TILE_DIM + threadIdx.x;
-        int dy = blockIdx.x * TILE_DIM + threadIdx.y;
-        for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
-            tile_s[threadIdx.y + j][threadIdx.x] = data[(y + j) * width + x];
-        for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
-            tile_d[threadIdx.y + j][threadIdx.x] = data[(dy + j) * width + dx];
-        __syncthreads();
-        for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
-            data[(dy + j) * width + dx] = tile_s[threadIdx.x][threadIdx.y + j];
-        for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
-            data[(y + j) * width + x] = tile_d[threadIdx.x][threadIdx.y + j];
+void imprimirMatrizPorPantalla(char* texto_mostrar, float matriz[], int n_filas, int n_columnas) {
+    printf("\n%s\n", texto_mostrar);
+    for (int i = 0; i < n_filas; i++) {
+        imprimirVectorPorPantalla(" ", matriz, i * n_columnas, i * n_columnas + n_columnas);
     }
-
-    else if (blockIdx.y == blockIdx.x) { // handle on-diagonal case
-        for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
-            tile_s[threadIdx.y + j][threadIdx.x] = data[(y + j) * width + x];
-        __syncthreads();
-        for (int j = 0; j < TILE_DIM; j += BLOCK_ROWS)
-            data[(y + j) * width + x] = tile_s[threadIdx.x][threadIdx.y + j];
-    }
+    printf("\n");
 }
 
-int validate(const float* mat, const float* mat_t, int n, int m) {
-    int result = 1;
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < m; j++)
-            if (mat[(i * m) + j] != mat_t[(j * n) + i]) result = 0;
-    return result;
+const float alpha = 1.0f;
+const float beta = 0.0f;
+
+const void productoMatricesTrasposedBDevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n) {
+    cublasSgemm_v2_64(handle, CUBLAS_OP_T, CUBLAS_OP_N, n, m, k, &alpha, b, k, a, k, &beta, c, n);
+}
+
+const void productoMatricesTrasposedADevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n) {
+    cublasSgemm_v2_64(handle, CUBLAS_OP_N, CUBLAS_OP_T, n, m, k, &alpha, b, n, a, m, &beta, c, n);
 }
 
 int main() {
 
+    /*
+        IMPORTANTE SOBRE CUBLASSGEMM!! -> TODAS LAS MATRICES SE CONSIDERAN COMO COLUMN MAJOR! ES DECIR, QUE SE GUARDAN EN UN VECTOR, Y TIENEN
+        CONTIGUAS LAS COLUMNAS EN VEZ DE LAS FILAS :) (MIRAR LA IMAGEN)
 
-    float* matrix = (float*)malloc(N * M * sizeof(float));
-    for (int i = 0; i < N; i++)
-        for (int j = 0; j < M; j++)
-            matrix[(i * M) + j] = i;
-    // Starting the timer
+        CUANDO PONGO CUBLAS_OP_N, CONSIDERO LA MATRIZ COMO COLUMN MAJOR, Y CUANDO PONGO CUBLAS_OP_T, COMO ROW MAJOR (LA FORMA DE GUARDARLO EN
+        UN VECTOR 1D DE TODA LA VIDA)
 
-    std::chrono::time_point<std::chrono::system_clock> startCPU, endCPU;
+        EL PROBLEMA ES QUE LA MATRIZ C SIEMPRE SE VA A GUARDAR EN FORMATO COLUMN MAJOR :)
 
-    startCPU = std::chrono::system_clock::now();
+        ES POR ESO QUE A*B = C, T(A)*T(B) = T(C) -> LA TRASPUESTA DE COLUMN MAJOR ES UNA ROW MAJOR
+    */
 
-    float* matrixT = (float*)malloc(N * M * sizeof(float));
-    for (int i = 0; i < N; i++)
-        for (int j = 0; j < M; j++)
-            matrixT[(j * N) + i] = matrix[(i * M) + j]; // matrix is obviously filled
-    //Ending the timer
-    
-    endCPU = std::chrono::system_clock::now();
+    /*
+    // Perform matrix multiplication with B transposed
+    // 
+    // Matrix dimensions
+    int m = 3; // Number of rows of A and C
+    int n = 4; // Number of columns of B and C
+    int k = 5; // Number of columns of A and rows of B (must match for multiplication)
 
-    if (!validate(matrix, matrixT, N, M)) { printf("fail!\n"); return 1; }
+    // Allocate memory for matrices on the CPU
+    float* h_A = new float[m * k];
+    float* h_B = new float[n * k];
+    float* h_C = new float[m * n];  
 
-    std::chrono::duration<double> elapsed_seconds = endCPU - startCPU;
-    std::time_t end_time = std::chrono::system_clock::to_time_t(endCPU);
+    // Initialize matrices A and B
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < k; j++) {
+            h_A[i * k + j] = i * k + j;
+        }
+    }
 
-    std::cout << "CPU elapsed time: " << elapsed_seconds.count() << "s; " << elapsed_seconds.count() * 1000 << "ms\n";
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < k; j++) {
+            h_B[i * k + j] = j+1;
+        }
+    }
 
-    float* h_matrixT, * d_matrixT, * d_matrix;
-    h_matrixT = (float*)(malloc(N * M * sizeof(float)));
-    cudaMalloc((void**)&d_matrixT, N * M * sizeof(float));
-    cudaMalloc((void**)&d_matrix, N * M * sizeof(float));
-    cudaMemcpy(d_matrix, matrix, N * M * sizeof(float), cudaMemcpyHostToDevice);
+    imprimirMatrizPorPantalla("A", h_A, m, k);
+    imprimirMatrizPorPantalla("B", h_B, n, k);
 
-    //Starting the timer
-
-    const float alpha = 1.0;
-    const float beta = 0.0;
+    // Initialize cuBLAS
     cublasHandle_t handle;
-    //gettimeofday(&t1, NULL);
     cublasCreate(&handle);
-    cublasSgeam(handle, CUBLAS_OP_T, CUBLAS_OP_N, N, M, &alpha, d_matrix, M, &beta, d_matrix, N, d_matrixT, N);
-    cudaDeviceSynchronize();
-    startCPU = std::chrono::system_clock::now();
-    for(int i = 0; i < 100; i++)
-        cublasSgeam(handle, CUBLAS_OP_T, CUBLAS_OP_N, N, M, &alpha, d_matrix, M, &beta, d_matrix, N, d_matrixT, N);
-    endCPU = std::chrono::system_clock::now();
-    elapsed_seconds = endCPU - startCPU;
-    end_time = std::chrono::system_clock::to_time_t(endCPU);
 
-    std::cout << "Cublas elapsed time: " << elapsed_seconds.count()/(float)100 << "s; " << elapsed_seconds.count() / (float)100 * 1000 << "ms\n";
+    // Allocate memory for matrices on the GPU
+    float* d_A, * d_B, * d_C;
+    cudaMalloc(&d_A, m * k * sizeof(float));
+    cudaMalloc(&d_B, k * n * sizeof(float));
+    cudaMalloc(&d_C, m * n * sizeof(float));
+
+    // Transfer data from CPU to GPU
+    cudaMemcpy(d_A, h_A, m * k * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, h_B, k * n * sizeof(float), cudaMemcpyHostToDevice);
+    
+    productoMatricesTrasposedBDevice(handle, d_A, d_B, d_C, m, k, n);
+    cudaMemcpy(h_C, d_C, m * n * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("C", h_C, m, n);
+
+    // Clean up
     cublasDestroy(handle);
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+    delete[] h_A;
+    delete[] h_B;
+    delete[] h_C;
+    */
 
-    cudaMemcpy(h_matrixT, d_matrixT, N * M * sizeof(float), cudaMemcpyDeviceToHost);
-    if (!validate(matrix, h_matrixT, N, M)) { printf("fail!\n"); return 1; }
-    cudaMemset(d_matrixT, 0, N * M * sizeof(float));
-    memset(h_matrixT, 0, N * M * sizeof(float));
-    dim3 threads(TILE_DIM, BLOCK_ROWS);
-    dim3 blocks(N / TILE_DIM, M / TILE_DIM);
-    startCPU = std::chrono::system_clock::now();
-    transposeCoalesced << <blocks, threads >> > (d_matrixT, d_matrix);
-    cudaDeviceSynchronize();
-    endCPU = std::chrono::system_clock::now();
-    cudaMemcpy(h_matrixT, d_matrixT, N * M * sizeof(float), cudaMemcpyDeviceToHost);
-    if (!validate(matrix, h_matrixT, N, M)) { printf("fail!\n"); return 1; }
-    elapsed_seconds = endCPU - startCPU;
-    end_time = std::chrono::system_clock::to_time_t(endCPU);
+    ///*
+    // Perform matrix multiplication with A transposed
+    //
+    // Matrix dimensions
+    int m = 3; // Number of rows of A and C
+    int n = 4; // Number of columns of B and C
+    int k = 5; // Number of columns of A and rows of B (must match for multiplication)
 
-    std::cout << "Kernel out of place elapsed time: " << elapsed_seconds.count() << "s; " << elapsed_seconds.count() * 1000 << "ms\n";
+    // Allocate memory for matrices on the CPU
+    float* h_A = new float[k * m];
+    float* h_B = new float[k * n];
+    float* h_C = new float[m * n];
 
-    memset(h_matrixT, 0, N * M * sizeof(float));
-    startCPU = std::chrono::system_clock::now();
-    iptransposeCoalesced << <blocks, threads >> > (d_matrix);
-    cudaDeviceSynchronize();
-    endCPU = std::chrono::system_clock::now();
-    cudaMemcpy(h_matrixT, d_matrix, N * M * sizeof(float), cudaMemcpyDeviceToHost);
-    if (!validate(matrix, h_matrixT, N, M)) { printf("fail!\n"); return 1; }
-    elapsed_seconds = endCPU - startCPU;
-    end_time = std::chrono::system_clock::to_time_t(endCPU);
-    std::cout << "Kernel in place elapsed time: " << elapsed_seconds.count() << "s; " << elapsed_seconds.count() * 1000 << "ms\n";
+    // Initialize matrices A and B
+    for (int i = 0; i < k; ++i) {
+        for (int j = 0; j < m; j++) {
+            h_A[i * m + j] = i+1;
+        }
+    }
 
-    cudaFree(d_matrix);
-    cudaFree(d_matrixT);
+    for (int i = 0; i < k; ++i) {
+        for (int j = 0; j < n; j++) {
+            h_B[i * n + j] = i * n + j;
+        }
+    }
+
+    imprimirMatrizPorPantalla("A", h_A, k, m);
+    imprimirMatrizPorPantalla("B", h_B, k, n);
+
+    // Initialize cuBLAS
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+
+    // Allocate memory for matrices on the GPU
+    float* d_A, * d_B, * d_C;
+    cudaMalloc(&d_A, m * k * sizeof(float));
+    cudaMalloc(&d_B, k * n * sizeof(float));
+    cudaMalloc(&d_C, m * n * sizeof(float));
+
+    // Transfer data from CPU to GPU
+    cudaMemcpy(d_A, h_A, m * k * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, h_B, k * n * sizeof(float), cudaMemcpyHostToDevice);
+
+    productoMatricesTrasposedADevice(handle, d_A, d_B, d_C, m, k, n);
+    cudaMemcpy(h_C, d_C, m * n * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("C", h_C, m, n);
+
+    // Clean up
+    cublasDestroy(handle);
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+    delete[] h_A;
+    delete[] h_B;
+    delete[] h_C;
+    //*/
+
     return 0;
 }

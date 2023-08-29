@@ -33,8 +33,6 @@ class Network {
         //also is used for cost function summatory, perfectly fits in
         float* d_output_forward_multiple_nn_sum;
         float** d_output_forward_multiple_nn_sum_pointers = NULL;
-        //matrix where all temporal transposes are stored
-        float* d_auxiliar_matrix_transpose = NULL;
         //matrix where changed-order output is copied and loss function is calculated, and also is stored backpropagated error of current layer
         float* d_auxiliar_matrix_loss_function_error_backprop = NULL;
 

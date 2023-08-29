@@ -173,7 +173,7 @@ void Network::initForwardTrain(int m_num_examples, int m_batch_size) {
 		layers[i]->setNumberInputExamples(max_batch_size);
 		layers[i]->setAuxiliarExpandReduceMatrix(d_auxiliar_expand_reduce_matrix);
 		layers[i]->allocForwardMemory();
-		layers[i]->allocBackwardMemory(m_batch_size, d_auxiliar_matrix_transpose, d_auxiliar_matrix_loss_function_error_backprop);
+		layers[i]->allocBackwardMemory(m_batch_size, d_auxiliar_matrix_loss_function_error_backprop);
 		layers[i]->setIsTraining(true);
 	}
 
@@ -189,7 +189,6 @@ void Network::initForwardTrain(int m_num_examples, int m_batch_size) {
 	for (int i = 0; i < number_layers; i++) {
 		if (max(second_max, layers[i]->getSize()) < first_max) { second_max = max(second_max, layers[i]->getSize()); }
 	}
-	cudaMalloc(&d_auxiliar_matrix_transpose, nextFourMultiple(max_batch_size * number_networks * output_size) * sizeof(float));
 
 	//Cublas warmup
 	productoMatricesDevice(handle, d_auxiliar_expand_reduce_matrix, layers[number_layers - 1]->getDeviceForward(), d_output_forward_multiple_nn_sum, 1, number_networks, output_size);
@@ -419,8 +418,7 @@ void Network::finalizeForward() {
 	cudaFree(d_output_forward_multiple_nn_sum);
 	if (d_output_forward_multiple_nn_sum_pointers != NULL) { cudaFree(d_output_forward_multiple_nn_sum_pointers);  d_output_forward_multiple_nn_sum_pointers = NULL; }
 
-	if (d_auxiliar_matrix_transpose != NULL) { cudaFree(d_auxiliar_matrix_transpose);  d_auxiliar_matrix_transpose = NULL; }
-	if (d_auxiliar_matrix_loss_function_error_backprop != NULL) { cudaFree(d_auxiliar_matrix_loss_function_error_backprop);  d_auxiliar_matrix_loss_function_error_backprop = NULL; }
+	if (d_auxiliar_matrix_loss_function_error_backprop != NULL) { cudaFree(d_auxiliar_matrix_loss_function_error_backprop); d_auxiliar_matrix_loss_function_error_backprop = NULL; }
 
 	cudaDeviceSynchronize();
 	max_batch_size = 0;

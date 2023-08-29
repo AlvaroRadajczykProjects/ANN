@@ -48,8 +48,6 @@ class Layer {
         float** d_error_weight_matrices_pointers = NULL;
         float** d_error_bias_vectors_pointers = NULL;
 
-        //esta será la matriz auxiliar para trasponer cualquier matriz que sea necesaria
-        float* d_auxiliar_transpose_matrix = NULL;
         //será la matriz de device de tamaño max(nelems_entrada+nelems_salida, nelems_mayor_capa_salida)
         float* d_auxiliar_error_forward_layer = NULL;
         float** d_auxiliar_error_forward_layer_pointers = NULL;
@@ -97,7 +95,7 @@ class Layer {
         void allocForwardMemory();
         void freeForwardMemory();
 
-        void allocBackwardMemory(int batch_size, float* d_aux_transpose_matrix, float* d_aux_error_matrix);
+        void allocBackwardMemory(int batch_size, float* d_aux_error_matrix);
         void freeBackwardMemory();
 
         void copyWeightBias( float* h_weight, float* h_bias );

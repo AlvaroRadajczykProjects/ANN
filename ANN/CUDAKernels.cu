@@ -12,12 +12,32 @@ int nextFourMultiple(int val) {
     else { return val + (4 - (val % 4)); }
 }
 
+const void matrizTraspuestaDevice(cublasHandle_t handle, float* odata, float* idata, int m, int n) {
+    cublasSgeam_64(handle, CUBLAS_OP_T, CUBLAS_OP_N, m, n, &alpha, idata, n, &beta_nosum, idata, m, odata, m);
+}
+
 const void productoMatricesDevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n) {
     cublasSgemm_v2_64(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, b, n, a, k, &beta_nosum, c, n);
 }
 
+const void productoMatricesTrasposedBDevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n) {
+    cublasSgemm_v2_64(handle, CUBLAS_OP_T, CUBLAS_OP_N, n, m, k, &alpha, b, k, a, k, &beta_nosum, c, n);
+}
+
+const void productoMatricesTrasposedADevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n) {
+    cublasSgemm_v2_64(handle, CUBLAS_OP_N, CUBLAS_OP_T, n, m, k, &alpha, b, n, a, m, &beta_nosum, c, n);
+}
+
 const void productoMatricesBatchDevice(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr) {
     cublasSgemmBatched_64(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, b, n, a, k, &beta_nosum, c, n, num_matr);
+}
+
+const void productoMatricesTrasposedBBatchDevice(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr) {
+    cublasSgemmBatched_64(handle, CUBLAS_OP_T, CUBLAS_OP_N, n, m, k, &alpha, b, k, a, k, &beta_nosum, c, n, num_matr);
+}
+
+const void productoMatricesTrasposedABatchDevice(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr) {
+    cublasSgemmBatched_64(handle, CUBLAS_OP_N, CUBLAS_OP_T, n, m, k, &alpha, b, n, a, m, &beta_nosum, c, n, num_matr);
 }
 
 const void productoMatricesBatchDeviceSumC(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr) {

@@ -26,6 +26,8 @@ void manageCUDAError(cudaError_t status, char* description);
 
 int nextFourMultiple(int val);
 
+const void matrizTraspuestaDevice(cublasHandle_t handle, float* odata, float* idata, int m, int n);
+
 const void productoMatricesDevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n);
 
 const void productoMatricesBatchDevice(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr);

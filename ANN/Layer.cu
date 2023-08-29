@@ -155,6 +155,9 @@ void Layer::backward(cudaStream_t stream, Layer* previous_layer, int num_outputs
     productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
     //multiplyAllElementsByConstantVectorial << < (int) ceil(nextFourMultiple(num_outputs) / ((float)max_num_threads * 4)), min(max_num_threads, (int)(nextFourMultiple(number_networks * size) / (float)4)), 0, stream >> > (d_error_array_bias_vector, 1 / (float)num_outputs);
     managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_error_array_bias_vector, 1 / (float)num_outputs);
+    for (int i = 0; i < number_networks; i++) {
+
+    }
 }
 
 void Layer::backward(cudaStream_t stream, int num_outputs) {
@@ -165,6 +168,9 @@ void Layer::backward(cudaStream_t stream, int num_outputs) {
     productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
     //multiplyAllElementsByConstantVectorial << < (int)ceil(nextFourMultiple(num_outputs) / ((float)max_num_threads * 4)), min(max_num_threads, (int)(nextFourMultiple(number_networks * size) / (float)4)), 0, stream >> > (d_error_array_bias_vector, 1 / (float)num_outputs);
     managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_error_array_bias_vector, 1 / (float)num_outputs);
+    for (int i = 0; i < number_networks; i++) {
+
+    }
 }
 
 void Layer::allocWeightMatricesMemory() {
@@ -225,8 +231,7 @@ void Layer::freeForwardMemory() {
     number_input_examples = 0;
 }
 
-void Layer::allocBackwardMemory(int batch_size, float* d_aux_transpose_matrix, float* d_aux_error_matrix) {
-    d_auxiliar_transpose_matrix = d_aux_transpose_matrix;
+void Layer::allocBackwardMemory(int batch_size, float* d_aux_error_matrix) {
     d_auxiliar_error_forward_layer = d_aux_error_matrix;
 
     cudaMalloc( &d_error_array_weight_matrix, nextFourMultiple(input_size * size * number_networks) * sizeof(float));
@@ -249,7 +254,6 @@ void Layer::allocBackwardMemory(int batch_size, float* d_aux_transpose_matrix, f
 }
 
 void Layer::freeBackwardMemory() {
-    d_auxiliar_transpose_matrix = NULL;
     d_auxiliar_error_forward_layer = NULL;
     if (d_error_array_weight_matrix != NULL) { cudaFree(d_error_array_weight_matrix); d_error_array_weight_matrix = NULL; }
     if (d_error_array_bias_vector != NULL) { cudaFree(d_error_array_bias_vector); d_error_array_bias_vector = NULL; }
