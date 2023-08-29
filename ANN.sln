@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CopyHostToDeviceOverlaped",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OtroThrush", "OtroThrush\OtroThrush.vcxproj", "{BDE53E9A-964B-45FE-A36E-C4EC0A4BD5B2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MatrixTransposeTrials", "MatrixTransposeTrials\MatrixTransposeTrials.vcxproj", "{CB42DA79-FB26-4D17-B27C-9EEC1622317A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -57,6 +59,10 @@ Global
 		{BDE53E9A-964B-45FE-A36E-C4EC0A4BD5B2}.Debug|x64.Build.0 = Debug|x64
 		{BDE53E9A-964B-45FE-A36E-C4EC0A4BD5B2}.Release|x64.ActiveCfg = Release|x64
 		{BDE53E9A-964B-45FE-A36E-C4EC0A4BD5B2}.Release|x64.Build.0 = Release|x64
+		{CB42DA79-FB26-4D17-B27C-9EEC1622317A}.Debug|x64.ActiveCfg = Debug|x64
+		{CB42DA79-FB26-4D17-B27C-9EEC1622317A}.Debug|x64.Build.0 = Debug|x64
+		{CB42DA79-FB26-4D17-B27C-9EEC1622317A}.Release|x64.ActiveCfg = Release|x64
+		{CB42DA79-FB26-4D17-B27C-9EEC1622317A}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

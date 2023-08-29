@@ -66,6 +66,7 @@ class Layer {
 
         void showInfo();
         void showWeightBias();
+        void showErrorWeightBias();
         void showAuxiliarExpandReduce();
         void showForward();
 
@@ -87,13 +88,15 @@ class Layer {
         void forward(cudaStream_t stream, float** d_input_pointers, int num_inputs);
         void forward(cudaStream_t stream, Layer* previous_layer, int num_inputs);
 
+        void backward(cudaStream_t stream, Layer* previous_layer, int num_outputs);
+        void backward(cudaStream_t stream, int num_outputs);
+
         void allocWeightMatricesMemory();
         void freeWeightMatricesMemory();
 
         void allocForwardMemory();
         void freeForwardMemory();
 
-        void allocBackwardMemory(float* d_aux_transpose_matrix, float* d_aux_error_matrix);
         void allocBackwardMemory(int batch_size, float* d_aux_transpose_matrix, float* d_aux_error_matrix);
         void freeBackwardMemory();
 

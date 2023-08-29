@@ -58,7 +58,7 @@ int main() {
     Network* n = new Network(2, 2, 2, new Layer* [2]{
         l1,
         l2
-    });
+    }, MSE, dMSE);
 
     l1->copyWeightBias(new float[8] {1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509, 1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509}, new float[4] {-1.1172228848589787, 5.448566789132996e-10, -1.1172228848589787, 5.448566789132996e-10});
     l2->copyWeightBias(new float[4] {-1.9048641164238775, 1.2619510820705655, -1.9048641164238775, 1.2619510820705655}, new float[2] {-0.12816004082232135, -0.12816004082232135});
@@ -83,6 +83,7 @@ int main() {
     delete n;
     */
 
+    ///*
     Layer* l1 = new Layer(2, ELU, dELU);
     Layer* l2 = new Layer(1, Linear, dLinear);
 
@@ -119,9 +120,13 @@ int main() {
 
     n->copyInputOutputTrain(8, input, output);
 
+    n->showErrorWeightsBiasesLayers();
+
     //n->forwardTrain(2);
-    float* err = n->trainGetCostFunctionAndCalculateLossFunction(8, 2, new int[2]{2, 3});
-    //float err = n->backwardPhaseSGD(8, 2, new int[2]{2, 3});
+    //float* err = n->trainGetCostFunctionAndCalculateLossFunction(8, 2, new int[2]{2, 3});
+    float* err = n->backwardPhaseSGD(8, 2, new int[2]{2, 3});
+
+    n->showErrorWeightsBiasesLayers();
 
     float cost_err = 0.0f;
     for (int i = 0; i < n->getNumberNetwors(); i++) {
@@ -135,6 +140,7 @@ int main() {
     n->finalizeForward();
 
     delete n;
+    //*/
 
     /*
     Network* n = new Network(256, 2, 3, new Layer * [3] {

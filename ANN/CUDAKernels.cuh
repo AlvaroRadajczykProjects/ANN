@@ -34,6 +34,8 @@ const void productoMatricesBatchDeviceSumC(cublasHandle_t handle, float** a, flo
 
 __global__ void applyFunctionVectorial(float* arr, func_t func);
 
+__global__ void applyFunctionScalar(float* arr, func_t func);
+
 __global__ void applyLossFunctionVectorial(float* pred, float* real, float* dst, func2_t func);
 
 __global__ void applyLossFunctionScalar(float* pred, float* real, float* dst, func2_t func);
@@ -42,4 +44,20 @@ __global__ void multiplyAllElementsByConstantVectorial(float* arr, float ct);
 
 __global__ void multiplyAllElementsByConstantScalar(float* arr, float ct);
 
-__global__ void sumVectorsSameDimensions(float* dst, float* src);
+__global__ void sumVectorsSameDimensionsVectorial(float* dst, float* src);
+
+__global__ void sumVectorsSameDimensionsScalar(float* dst, float* src);
+
+__global__ void multiplyMatricesSameDimensionsVectorial(float* dst, float* src);
+
+__global__ void multiplyMatricesSameDimensionsScalar(float* dst, float* src);
+
+const void managedApplyFunction(cudaStream_t stream, int max_num_threads, int num_elems, float* arr, func_t func);
+
+const void managedApplyLossFunction(cudaStream_t stream, int max_num_threads, int num_elems, float* pred, float* real, float* dst, func2_t func);
+
+const void managedMultiplyAllElementsByConstant(cudaStream_t stream, int max_num_threads, int num_elems, float* arr, float ct);
+
+const void managedSumVectorsSameDimensions(cudaStream_t stream, int max_num_threads, int num_elems, float* dst, float* src);
+
+const void managedMultiplyMatricesSameDimensions(cudaStream_t stream, int max_num_threads, int num_elems, float* dst, float* src);

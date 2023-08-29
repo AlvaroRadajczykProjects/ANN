@@ -52,6 +52,7 @@ class Network {
 
         void showInfoAboutNetwork();
         void showWeightsBiasesLayers();
+        void showErrorWeightsBiasesLayers();
         void showAuxiliarExpandReduceMatrices();
         void showForwardMatrices();
 

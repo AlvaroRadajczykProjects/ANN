@@ -35,6 +35,12 @@ __global__ void applyFunctionVectorial(float* arr, func_t func) {
     reinterpret_cast<float4*>(arr)[idx] = val;
 }
 
+__global__ void applyFunctionScalar(float* arr, func_t func) {
+    //https://forums.developer.nvidia.com/t/the-float-and-float4-types-in-cuda/65061
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    arr[idx] = func(arr[idx]);
+}
+
 __global__ void applyLossFunctionVectorial(float* pred, float* real, float* dst, func2_t func) {
     //https://forums.developer.nvidia.com/t/the-float-and-float4-types-in-cuda/65061
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -68,7 +74,7 @@ __global__ void multiplyAllElementsByConstantScalar(float* arr, float ct) {
     arr[idx] = arr[idx] * ct;
 }
 
-__global__ void sumVectorsSameDimensions(float* dst, float* src) {
+__global__ void sumVectorsSameDimensionsVectorial(float* dst, float* src) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     float4 val_src = reinterpret_cast<float4*>(src)[idx];
     float4 val_dst = reinterpret_cast<float4*>(dst)[idx];
@@ -77,4 +83,80 @@ __global__ void sumVectorsSameDimensions(float* dst, float* src) {
     val_src.z = val_src.z + val_dst.z;
     val_src.w = val_src.w + val_dst.w;
     reinterpret_cast<float4*>(dst)[idx] = val_src;
+}
+
+__global__ void sumVectorsSameDimensionsScalar(float* dst, float* src) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    dst[idx] = dst[idx] + src[idx];
+}
+
+__global__ void multiplyMatricesSameDimensionsVectorial(float* dst, float* src) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    float4 val_src = reinterpret_cast<float4*>(src)[idx];
+    float4 val_dst = reinterpret_cast<float4*>(dst)[idx];
+    val_src.x = val_src.x * val_dst.x;
+    val_src.y = val_src.y * val_dst.y;
+    val_src.z = val_src.z * val_dst.z;
+    val_src.w = val_src.w * val_dst.w;
+    reinterpret_cast<float4*>(dst)[idx] = val_src;
+}
+
+__global__ void multiplyMatricesSameDimensionsScalar(float* dst, float* src) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    dst[idx] = dst[idx] + src[idx];
+}
+
+const void managedApplyFunction(cudaStream_t stream, int max_num_threads, int num_elems, float* arr, func_t func) {
+    int nblocks = (int)(num_elems / (4 * max_num_threads));
+    applyFunctionVectorial <<< nblocks, max_num_threads, 0, stream >> > (arr, func);
+    num_elems -= (nblocks * 4 * max_num_threads);
+    int offset = (nblocks * 4 * max_num_threads);
+    applyFunctionVectorial << < 1, (int) (num_elems/4), 0, stream >> > (arr + offset, func);
+    num_elems -= (num_elems / 4) * 4;
+    offset += ((num_elems / 4) * 4);
+    applyFunctionScalar << < 1, num_elems%4, 0, stream >> > (arr + offset, func);
+}
+
+const void managedApplyLossFunction(cudaStream_t stream, int max_num_threads, int num_elems, float* pred, float* real, float* dst, func2_t func) {
+    int nblocks = (int)(num_elems / (4 * max_num_threads));
+    applyLossFunctionVectorial << < nblocks, max_num_threads, 0, stream >> > (pred, real, dst, func);
+    num_elems -= (nblocks * 4 * max_num_threads);
+    int offset = (nblocks * 4 * max_num_threads);
+    applyLossFunctionVectorial << < 1, (int)(num_elems / 4), 0, stream >> > (pred+ offset, real+ offset, dst+ offset, func);
+    num_elems -= (num_elems / 4) * 4;
+    offset += ((num_elems / 4) * 4);
+    applyLossFunctionScalar << < 1, num_elems % 4, 0, stream >> > (pred + offset, real + offset, dst + offset, func);
+}
+
+const void managedMultiplyAllElementsByConstant(cudaStream_t stream, int max_num_threads, int num_elems, float* arr, float ct) {
+    int nblocks = (int)(num_elems / (4 * max_num_threads));
+    multiplyAllElementsByConstantVectorial << < nblocks, max_num_threads, 0, stream >> > (arr, ct);
+    num_elems -= (nblocks * 4 * max_num_threads);
+    int offset = (nblocks * 4 * max_num_threads);
+    multiplyAllElementsByConstantVectorial << < 1, (int)(num_elems / 4), 0, stream >> > (arr + offset, ct);
+    num_elems -= (num_elems / 4) * 4;
+    offset += ((num_elems / 4) * 4);
+    multiplyAllElementsByConstantScalar << < 1, num_elems % 4, 0, stream >> > (arr + offset, ct);
+}
+
+const void managedSumVectorsSameDimensions(cudaStream_t stream, int max_num_threads, int num_elems, float* dst, float* src) {
+    int nblocks = (int)(num_elems / (4 * max_num_threads));
+    sumVectorsSameDimensionsVectorial << < nblocks, max_num_threads, 0, stream >> > (dst, src);
+    num_elems -= (nblocks * 4 * max_num_threads);
+    int offset = (nblocks * 4 * max_num_threads);
+    sumVectorsSameDimensionsVectorial << < 1, (int)(num_elems / 4), 0, stream >> > (dst + offset, src + offset);
+    num_elems -= (num_elems / 4) * 4;
+    offset += ((num_elems / 4) * 4);
+    sumVectorsSameDimensionsScalar << < 1, num_elems % 4, 0, stream >> > (dst + offset, src + offset);
+}
+
+const void managedMultiplyMatricesSameDimensions(cudaStream_t stream, int max_num_threads, int num_elems, float* dst, float* src) {
+    int nblocks = (int)(num_elems / (4 * max_num_threads));
+    multiplyMatricesSameDimensionsVectorial << < nblocks, max_num_threads, 0, stream >> > (dst, src);
+    num_elems -= (nblocks * 4 * max_num_threads);
+    int offset = (nblocks * 4 * max_num_threads);
+    multiplyMatricesSameDimensionsVectorial << < 1, (int)(num_elems / 4), 0, stream >> > (dst + offset, src + offset);
+    num_elems -= (num_elems / 4) * 4;
+    offset += ((num_elems / 4) * 4);
+    multiplyMatricesSameDimensionsScalar << < 1, num_elems % 4, 0, stream >> > (dst + offset, src + offset);
 }

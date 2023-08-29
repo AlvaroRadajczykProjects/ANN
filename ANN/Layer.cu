@@ -37,6 +37,20 @@ void Layer::showWeightBias() {
     }
 }
 
+void Layer::showErrorWeightBias() {
+    for (int i = 0; i < number_networks; i++) {
+        float* h_weight_m = new float[input_size * size];
+        float* h_bias_v = new float[size];
+        cudaMemcpy(h_weight_m, hd_error_weight_matrices_pointers[i], input_size * size * sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_bias_v, hd_error_bias_vectors_pointers[i], size * sizeof(float), cudaMemcpyDeviceToHost);
+        printf("\n\tNetwork %d:", i);
+        imprimirMatrizPorPantalla("\n\t\tbias:", h_bias_v, 1, size);
+        imprimirMatrizPorPantalla("\n\t\tweight:", h_weight_m, input_size, size);
+        delete h_weight_m;
+        delete h_bias_v;
+    }
+}
+
 void Layer::showAuxiliarExpandReduce() {
     for (int i = 0; i < number_networks; i++) {
         float* h_auxiliar_expand_reduce_matrix = new float[size];
@@ -122,13 +136,35 @@ void Layer::setCublasHandle(cublasHandle_t* h) {
 void Layer::forward(cudaStream_t stream, float** d_input_pointers, int num_inputs) {
     productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_bias_vectors_pointers, d_forward_pointers, num_inputs, 1, size, number_networks);
     productoMatricesBatchDeviceSumC(*handle, d_input_pointers, d_weight_matrices_pointers, d_forward_pointers, num_inputs, input_size, size, number_networks);
-    applyFunctionVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_forward, activation_function);
+    managedApplyFunction(stream, max_num_threads, nextFourMultiple(size*num_inputs*number_networks), d_forward, activation_function);
+    //applyFunctionVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_forward, activation_function);
 }
 
 void Layer::forward(cudaStream_t stream, Layer* previous_layer, int num_inputs) {
     productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_bias_vectors_pointers, d_forward_pointers, num_inputs, 1, size, number_networks);
     productoMatricesBatchDeviceSumC(*handle, previous_layer->getDeviceForwardPointers(), d_weight_matrices_pointers, d_forward_pointers, num_inputs, input_size, size, number_networks);
-    applyFunctionVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_forward, activation_function);
+    managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_inputs * number_networks), d_forward, activation_function);
+    //applyFunctionVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_forward, activation_function);
+}
+
+void Layer::backward(cudaStream_t stream, Layer* previous_layer, int num_outputs) {
+    //applyFunctionVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_forward, activation_derivative_function);
+    managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
+    //multiplyMatricesSameDimensionsVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_auxiliar_error_forward_layer, d_forward);
+    managedMultiplyMatricesSameDimensions( stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, d_forward);
+    productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
+    //multiplyAllElementsByConstantVectorial << < (int) ceil(nextFourMultiple(num_outputs) / ((float)max_num_threads * 4)), min(max_num_threads, (int)(nextFourMultiple(number_networks * size) / (float)4)), 0, stream >> > (d_error_array_bias_vector, 1 / (float)num_outputs);
+    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_error_array_bias_vector, 1 / (float)num_outputs);
+}
+
+void Layer::backward(cudaStream_t stream, int num_outputs) {
+    //applyFunctionVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_forward, activation_derivative_function);
+    managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
+    //multiplyMatricesSameDimensionsVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_auxiliar_error_forward_layer, d_forward);
+    managedMultiplyMatricesSameDimensions(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, d_forward);
+    productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
+    //multiplyAllElementsByConstantVectorial << < (int)ceil(nextFourMultiple(num_outputs) / ((float)max_num_threads * 4)), min(max_num_threads, (int)(nextFourMultiple(number_networks * size) / (float)4)), 0, stream >> > (d_error_array_bias_vector, 1 / (float)num_outputs);
+    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_error_array_bias_vector, 1 / (float)num_outputs);
 }
 
 void Layer::allocWeightMatricesMemory() {
@@ -187,25 +223,6 @@ void Layer::freeForwardMemory() {
         cudaFree(d_forward_pointers); d_forward_pointers = NULL;
     }
     number_input_examples = 0;
-}
-
-void Layer::allocBackwardMemory(float* d_aux_transpose_matrix, float* d_aux_error_matrix) {
-    d_auxiliar_transpose_matrix = d_aux_transpose_matrix;
-    d_auxiliar_error_forward_layer = d_aux_error_matrix;
-
-    cudaMalloc(&d_error_array_weight_matrix, nextFourMultiple(input_size * size * number_networks) * sizeof(float));
-    cudaMalloc(&d_error_array_bias_vector, nextFourMultiple(size * number_networks) * sizeof(float));
-    hd_error_weight_matrices_pointers = new float* [number_networks];
-    hd_error_bias_vectors_pointers = new float* [number_networks];
-    cudaMalloc(&d_auxiliar_error_forward_layer_pointers, number_networks * sizeof(float*));
-    cudaMalloc(&d_error_weight_matrices_pointers, number_networks * sizeof(float*));
-    cudaMalloc(&d_error_bias_vectors_pointers, number_networks * sizeof(float*));
-    for (int i = 0; i < number_networks; i++) {
-        hd_error_weight_matrices_pointers[i] = d_error_array_weight_matrix + i * (input_size * size);
-        hd_error_bias_vectors_pointers[i] = d_error_array_bias_vector + i * (size);
-    }
-    cudaMemcpy(d_error_weight_matrices_pointers, hd_error_weight_matrices_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_error_bias_vectors_pointers, hd_error_bias_vectors_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
 }
 
 void Layer::allocBackwardMemory(int batch_size, float* d_aux_transpose_matrix, float* d_aux_error_matrix) {
