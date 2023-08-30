@@ -8,6 +8,8 @@
 
 #include <cublas_v2.h>
 
+#include <random>
+#include <time.h>
 #include <curand.h>
 #include <curand_kernel.h>
 
@@ -30,7 +32,15 @@ const void matrizTraspuestaDevice(cublasHandle_t handle, float* odata, float* id
 
 const void productoMatricesDevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n);
 
+const void productoMatricesTrasposedBDevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n);
+
+const void productoMatricesTrasposedADevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n);
+
 const void productoMatricesBatchDevice(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr);
+
+const void productoMatricesTrasposedBBatchDevice(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr);
+
+const void productoMatricesTrasposedABatchDevice(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr);
 
 const void productoMatricesBatchDeviceSumC(cublasHandle_t handle, float** a, float** b, float** c, int m, int k, int n, int num_matr);
 

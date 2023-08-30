@@ -51,6 +51,8 @@ class Layer {
         //será la matriz de device de tamaño max(nelems_entrada+nelems_salida, nelems_mayor_capa_salida)
         float* d_auxiliar_error_forward_layer = NULL;
         float** d_auxiliar_error_forward_layer_pointers = NULL;
+        float* d_auxiliar2_error_forward_layer = NULL;
+        float** d_auxiliar2_error_forward_layer_pointers = NULL;
 
         float* d_weight_matrix_momentum = NULL;
         float* d_bias_vector_momentum = NULL;
@@ -83,11 +85,15 @@ class Layer {
         void setIsTraining(bool set);
         void setCublasHandle(cublasHandle_t* h);
 
+        void initWeightBiasValues(curandGenerator_t curandGenerator);
+
         void forward(cudaStream_t stream, float** d_input_pointers, int num_inputs);
         void forward(cudaStream_t stream, Layer* previous_layer, int num_inputs);
 
         void backward(cudaStream_t stream, Layer* previous_layer, int num_outputs);
-        void backward(cudaStream_t stream, int num_outputs);
+        void backward(cudaStream_t stream, float** input_pointers, int num_outputs);
+
+        void applyGradientSGD(cudaStream_t stream, float lrate);
 
         void allocWeightMatricesMemory();
         void freeWeightMatricesMemory();
@@ -95,7 +101,7 @@ class Layer {
         void allocForwardMemory();
         void freeForwardMemory();
 
-        void allocBackwardMemory(int batch_size, float* d_aux_error_matrix);
+        void allocBackwardMemory(int batch_size, float* d_aux_error_matrix, float* d_aux2_error_matrix);
         void freeBackwardMemory();
 
         void copyWeightBias( float* h_weight, float* h_bias );

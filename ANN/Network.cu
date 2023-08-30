@@ -168,12 +168,13 @@ void Network::initForwardTrain(int m_num_examples, int m_batch_size) {
 
 	//max_input_number_examples instead of max_batch_size * number_networks?
 	cudaMalloc(&d_auxiliar_matrix_loss_function_error_backprop, nextFourMultiple(max_batch_size * number_networks * max_layer_size) * sizeof(float));
+	cudaMalloc(&d_auxiliar2_matrix_loss_function_error_backprop, nextFourMultiple(max_batch_size * number_networks * max_layer_size) * sizeof(float));
 
 	for (int i = 0; i < number_layers; i++) {
 		layers[i]->setNumberInputExamples(max_batch_size);
 		layers[i]->setAuxiliarExpandReduceMatrix(d_auxiliar_expand_reduce_matrix);
 		layers[i]->allocForwardMemory();
-		layers[i]->allocBackwardMemory(m_batch_size, d_auxiliar_matrix_loss_function_error_backprop);
+		layers[i]->allocBackwardMemory(m_batch_size, d_auxiliar_matrix_loss_function_error_backprop, d_auxiliar2_matrix_loss_function_error_backprop);
 		layers[i]->setIsTraining(true);
 	}
 
@@ -194,6 +195,18 @@ void Network::initForwardTrain(int m_num_examples, int m_batch_size) {
 	productoMatricesDevice(handle, d_auxiliar_expand_reduce_matrix, layers[number_layers - 1]->getDeviceForward(), d_output_forward_multiple_nn_sum, 1, number_networks, output_size);
 
 	cudaDeviceSynchronize();
+}
+
+void Network::initWeightBiasValues() {
+	curandGenerator_t curandGenerator;
+	curandCreateGenerator(&curandGenerator, CURAND_RNG_PSEUDO_MT19937);
+	curandSetGeneratorOrdering(curandGenerator, CURAND_ORDERING_PSEUDO_BEST);
+	cudaDeviceSynchronize();
+	for (int i = 0; i < number_layers; i++) {
+		layers[i]->initWeightBiasValues(curandGenerator);
+	}
+	cudaDeviceSynchronize();
+	curandDestroyGenerator(curandGenerator);
 }
 
 const void Network::copyInputOutputTrain(int num_examples, float* input_data, float* output_data) {
@@ -338,19 +351,19 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 			}*/
 			cudaFree(d_res);
 
-			///*
+			/*
 			float* matriz_Cost = new float[num_elems_batch * number_networks];
 			cudaMemcpy(matriz_Cost, d_auxiliar_matrix_loss_function_error_backprop, num_elems_batch * number_networks * sizeof(float), cudaMemcpyDeviceToHost);
 			imprimirMatrizPorPantalla("Error de coste:", matriz_Cost, batch_size* number_networks, output_size);
 			delete matriz_Cost;
-			//*/
+			*/
 
-			///*
+			/*
 			float* mirarCost = new float[number_networks*output_size];
 			cudaMemcpy(mirarCost, d_output_forward_multiple_nn_sum, number_networks * output_size * sizeof(float), cudaMemcpyDeviceToHost);
 			imprimirMatrizPorPantalla("Error de coste sum:", mirarCost, number_networks, output_size);
 			delete mirarCost;
-			//*/
+			*/
 
 			//apply loss function
 			for (int i = 0; i < number_networks; i++) {
@@ -379,14 +392,14 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 	return NULL;
 }
 
-float* Network::backwardPhaseSGD(int num_examples, int batch_size, int* batch_ids) {
+float* Network::backwardPhase(int num_examples, int batch_size, int* batch_ids) {
 	if (batch_size <= max_input_number_examples) {
 		if (num_examples % batch_size == 0) {
 			float* cost_function = trainGetCostFunctionAndCalculateLossFunction(num_examples, batch_size, batch_ids);
 			for (int i = number_layers - 1; i > 0; i--) {
 				layers[i]->backward(stream_principal, layers[i - 1], batch_size);
 			}
-			layers[0]->backward(stream_principal, batch_size);
+			layers[0]->backward(stream_principal, d_input_pointers, batch_size);
 			return cost_function;
 		} else {
 			printf("\nwhen batch forwardTrain, num_examples % batch_size must be 0");
@@ -395,6 +408,12 @@ float* Network::backwardPhaseSGD(int num_examples, int batch_size, int* batch_id
 		printf("\nCannot make forward, more examples than max number of examples defined in initForward");
 	}
 	return NULL;
+}
+
+void Network::applyVGradSGD(float lrate) {
+	for (int i = 0; i < number_layers; i++) {
+		layers[i]->applyGradientSGD(stream_principal, lrate);
+	}
 }
 
 void Network::finalizeForward() {
@@ -419,6 +438,7 @@ void Network::finalizeForward() {
 	if (d_output_forward_multiple_nn_sum_pointers != NULL) { cudaFree(d_output_forward_multiple_nn_sum_pointers);  d_output_forward_multiple_nn_sum_pointers = NULL; }
 
 	if (d_auxiliar_matrix_loss_function_error_backprop != NULL) { cudaFree(d_auxiliar_matrix_loss_function_error_backprop); d_auxiliar_matrix_loss_function_error_backprop = NULL; }
+	if (d_auxiliar2_matrix_loss_function_error_backprop != NULL) { cudaFree(d_auxiliar2_matrix_loss_function_error_backprop); d_auxiliar2_matrix_loss_function_error_backprop = NULL; }
 
 	cudaDeviceSynchronize();
 	max_batch_size = 0;

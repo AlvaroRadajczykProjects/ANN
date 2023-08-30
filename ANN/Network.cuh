@@ -35,6 +35,7 @@ class Network {
         float** d_output_forward_multiple_nn_sum_pointers = NULL;
         //matrix where changed-order output is copied and loss function is calculated, and also is stored backpropagated error of current layer
         float* d_auxiliar_matrix_loss_function_error_backprop = NULL;
+        float* d_auxiliar2_matrix_loss_function_error_backprop = NULL;
 
         //also works as output pointers
         float** d_input_pointers = 0;
@@ -59,6 +60,8 @@ class Network {
         void initForward( int max_num_input_examples_expected );
         void initForwardTrain(int num_examples, int max_batch_size);
 
+        void initWeightBiasValues();
+
         const void copyInputOutputTrain(int num_examples, float* input_data, float* output_data);
 
         const void forward( int num_examples, float* input_data, float* output_pointer_dest);
@@ -69,7 +72,9 @@ class Network {
         float* trainGetCostFunctionAndCalculateLossFunction(int num_examples);
         float* trainGetCostFunctionAndCalculateLossFunction(int num_examples, int batch_size, int* batch_ids);
 
-        float* backwardPhaseSGD(int num_examples, int batch_size, int* batch_ids);
+        float* backwardPhase(int num_examples, int batch_size, int* batch_ids);
+
+        void applyVGradSGD(float lrate);
 
         void finalizeForward();
 

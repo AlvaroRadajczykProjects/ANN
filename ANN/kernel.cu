@@ -30,6 +30,7 @@ func3_t d_func3 = 0;
 
 int main() {
 
+    srand(time(NULL));
     
     cudaMalloc(&d_func, sizeof(func_t));
 
@@ -87,55 +88,27 @@ int main() {
     Layer* l1 = new Layer(2, ELU, dELU);
     Layer* l2 = new Layer(1, Linear, dLinear);
 
-    Network* n = new Network(2, 2, 2, new Layer * [2] {
+    Network* n = new Network(2, 1, 2, new Layer * [2] {
         l1,
         l2
     }, MSE, dMSE);
 
-    l1->copyWeightBias(new float[8] { 
-        -0.81775589848075, 1.1873691777569177, 0.8304462474145745, -1.3867368078695665,
-        -0.81775589848075, 1.1873691777569177, 0.8304462474145745, -1.3867368078695665,
-        }, new float[4] {
-        2.0221078760289283e-11, -4.659097141626316e-11,
-        2.0221078760289283e-11, -4.659097141626316e-11
-        }
-    );
-    l2->copyWeightBias(new float[4] {
-        1.2857076728085106, 0.9026820857209782, 
-        1.2857076728085106, 0.9026820857209782
-        }, new float[2] {
-        2.1129267741232126e-08, 
-        2.1129267741232126e-08
-    }
-    );
+    n->initWeightBiasValues();
 
-    //n->showWeightsBiasesLayers();
+    float* input = new float[4*2] { 0, 0, 0, 1, 1, 0, 1, 1 };
+    float* output = new float[4*1] { 0, 1, 1, 0 };
 
-    float* input = new float[4*2*2] { 9, 9, 9, 9, 9, 9, 9, 9, 0, 0, 0, 1, 1, 0, 1, 1 };
-    float* output = new float[4*1*2] { 9, 9, 9, 9, 0, 1, 1, 0 };
-
-    n->initForwardTrain(8, 2);
+    n->initForwardTrain(4, 2);
 
     //n->showAuxiliarExpandReduceMatrices();
 
-    n->copyInputOutputTrain(8, input, output);
+    n->copyInputOutputTrain(4, input, output);
 
-    n->showErrorWeightsBiasesLayers();
-
-    //n->forwardTrain(2);
-    //float* err = n->trainGetCostFunctionAndCalculateLossFunction(8, 2, new int[2]{2, 3});
-    float* err = n->backwardPhaseSGD(8, 2, new int[2]{2, 3});
-
-    n->showErrorWeightsBiasesLayers();
-
-    float cost_err = 0.0f;
-    for (int i = 0; i < n->getNumberNetwors(); i++) {
-        printf("\nError MSE en host para red %d: %.20f", i, err[i]);
-        cost_err += err[i];
+    for (int i = 0; i < 2; i++) {
+        printf("\n\nError MSE iteracion %d: %.20f\n", i + 1, n->backwardPhase(4, 4, new int[1] {0})[0]);
+        n->showErrorWeightsBiasesLayers();
+        n->applyVGradSGD(0.0001);
     }
-    printf("\n\nError MSE en host total: %.20f\n", cost_err/ n->getNumberNetwors());
-
-    n->showForwardMatrices();
 
     n->finalizeForward();
 
