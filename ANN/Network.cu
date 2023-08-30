@@ -378,7 +378,7 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 			/*
 			float* matriz_Cost = new float[num_elems_batch * number_networks];
 			cudaMemcpy(matriz_Cost, d_auxiliar_matrix_loss_function_error_backprop, num_elems_batch * number_networks * sizeof(float), cudaMemcpyDeviceToHost);
-			imprimirMatrizPorPantalla("Loss function applied:", matriz_Cost, batch_size* number_networks, output_size);
+			imprimirMatrizPorPantalla("Derivada Error de coste:", matriz_Cost, batch_size * number_networks, output_size);
 			delete matriz_Cost;
 			*/
 

@@ -84,7 +84,7 @@ int main() {
     delete n;
     */
 
-    ///*
+    /*
     Layer* l1 = new Layer(2, ELU, dELU);
     Layer* l2 = new Layer(1, Linear, dLinear);
 
@@ -93,22 +93,67 @@ int main() {
         l2
     }, MSE, dMSE);
 
+    l1->copyWeightBias(new float[4] {-0.6057236802202783, -1.3743868186905905, 0.6057236802202786, 1.3743868186905905}, new float[2] {0.6057236802202781, -2.2751145817937323e-17});
+    l2->copyWeightBias(new float[2] {-1.6689619673839928, 1.463146879527966}, new float[1] {1.0109297850315095});
+
+    float* input = new float[4 * 2] { 0, 0, 0, 1, 1, 0, 1, 1 };
+    float* output = new float[4 * 1] { 0, 1, 1, 0 };
+
+    n->initForward(4);
+
+    n->showWeightsBiasesLayers();
+
+    float* res = new float[4];
+    n->forward(4, input, res);
+
+    n->showForwardMatrices();
+
+    n->finalizeForward();
+
+    delete n;
+    */
+
+    //INTENTO DE ENTRENAMIENTO
+
+    ///*
+
+    Network* n = new Network(2, 1, 3, new Layer * [3] {
+        new Layer(10, ELU, dELU),
+        new Layer(10, ELU, dELU),
+        new Layer(1, Linear, dLinear)
+    }, MSE, dMSE);
+
     n->initWeightBiasValues();
+
+    n->showWeightsBiasesLayers();
 
     float* input = new float[4*2] { 0, 0, 0, 1, 1, 0, 1, 1 };
     float* output = new float[4*1] { 0, 1, 1, 0 };
 
-    n->initForwardTrain(4, 2);
+    n->initForwardTrain(4, 4);
 
     //n->showAuxiliarExpandReduceMatrices();
 
     n->copyInputOutputTrain(4, input, output);
+    float err = 0;
 
-    for (int i = 0; i < 2; i++) {
-        printf("\n\nError MSE iteracion %d: %.20f\n", i + 1, n->backwardPhase(4, 4, new int[1] {0})[0]);
-        n->showErrorWeightsBiasesLayers();
-        n->applyVGradSGD(0.0001);
+    for (int i = 0; i < 10000; i++) {
+        //n->showWeightsBiasesLayers();
+        //printf("\n\nError MSE iteracion %d: %.20f\n", i + 1, n->backwardPhase(4, 4, new int[1] {0})[0]);
+        //n->trainGetCostFunctionAndCalculateLossFunction(4, 4, new int[1] {0});
+        //n->showForwardMatrices();
+        //n->showErrorWeightsBiasesLayers();
+        err = n->backwardPhase(4, 4, new int[1] {0})[0];
+        if(i == 0 || (i+1)%500 == 0){ printf("\nError %d: %f", i+1, err); }
+        n->applyVGradSGD(0.1);
     }
+
+    n->showWeightsBiasesLayers();
+
+    float* res = new float[4];
+    //n->forward(1, new float[2 * 4] { 0, 0, 0, 1, 1, 0, 1, 1 }, res);
+    n->forwardTrain(4);
+    n->showForwardMatrices();
 
     n->finalizeForward();
 

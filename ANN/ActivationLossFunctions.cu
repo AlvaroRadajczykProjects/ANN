@@ -9,13 +9,13 @@ extern __device__ func_t d_watelu = kernel_watelu;
 
 //ELU
 __device__ float kernel_ELU(float x) {
-    if (x < 0) { return 0.1 * (expf(x) - 1); }
+    if (x < 0) { return 0.01 * (expf(x) - 1); }
     else { return x; }
 }
 extern __device__ func_t d_ELU = kernel_ELU;
 
 __device__ float kernel_dELU(float x) {
-    if (x < 0) { return 0.1 * ((x / 0.1) + 1); }
+    if (x < 0) { return 0.01 * ((x * 100) + 1); }
     else { return 1; }
 }
 extern __device__ func_t d_dELU = kernel_dELU;

@@ -156,6 +156,28 @@ void Layer::forward(cudaStream_t stream, Layer* previous_layer, int num_inputs) 
 }
 
 void Layer::backward(cudaStream_t stream, Layer* previous_layer, int num_outputs) {
+
+    managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
+    
+    managedMultiplyMatricesSameDimensions(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, d_forward);
+
+    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, 1 / (float)num_outputs);
+
+    //float* h_res = new float[nextFourMultiple(max(input_size, size) * num_outputs * number_networks)];
+    //cudaMemcpy(h_res, d_auxiliar_error_forward_layer, nextFourMultiple(size * num_outputs * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
+    //imprimirMatrizPorPantalla("bias nada mas ser calculado: ", h_res, num_outputs * number_networks, size);
+
+    //bias error
+    productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
+
+    //weight error
+    productoMatricesTrasposedABatchDevice(*handle, previous_layer->getDeviceForwardPointers(), d_auxiliar_error_forward_layer_pointers, d_error_weight_matrices_pointers, input_size, num_outputs, size, number_networks);
+
+    //previous layer error
+    productoMatricesTrasposedBBatchDevice(*handle, d_auxiliar_error_forward_layer_pointers, d_weight_matrices_pointers, d_auxiliar2_error_forward_layer_pointers, num_outputs, size, input_size, number_networks);
+    cudaMemcpy(d_auxiliar_error_forward_layer, d_auxiliar2_error_forward_layer, nextFourMultiple(num_outputs * input_size * number_networks) * sizeof(float), cudaMemcpyDeviceToDevice);
+    
+    /*
     //applyFunctionVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_forward, activation_derivative_function);
     managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
     //multiplyMatricesSameDimensionsVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_auxiliar_error_forward_layer, d_forward);
@@ -169,9 +191,30 @@ void Layer::backward(cudaStream_t stream, Layer* previous_layer, int num_outputs
     //previous layer error
     productoMatricesTrasposedBBatchDevice(*handle, d_auxiliar_error_forward_layer_pointers, d_weight_matrices_pointers, d_auxiliar2_error_forward_layer_pointers, num_outputs, size, input_size, number_networks);
     cudaMemcpy(d_auxiliar_error_forward_layer, d_auxiliar2_error_forward_layer, nextFourMultiple(num_outputs * input_size * number_networks) * sizeof(float), cudaMemcpyDeviceToDevice);
+    */
 }
 
 void Layer::backward(cudaStream_t stream, float** input_pointers, int num_outputs) {
+    
+    managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
+
+    managedMultiplyMatricesSameDimensions(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, d_forward);
+
+    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, 1 / (float)num_outputs);
+
+    //bias error
+    productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
+
+    //weight error
+    productoMatricesTrasposedABatchDevice(*handle, input_pointers, d_auxiliar_error_forward_layer_pointers, d_error_weight_matrices_pointers, input_size, num_outputs, size, number_networks);
+
+    //float* h_res = new float[nextFourMultiple(max(input_size, size) * num_outputs * number_networks)];
+    //cudaMemcpy(h_res, d_auxiliar_error_forward_layer, nextFourMultiple(input_size * num_outputs * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
+    //imprimirMatrizPorPantalla("error de la capa posterior calculado: ", h_res, num_outputs * number_networks, input_size);
+    
+    //managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
+
+    /*
     //applyFunctionVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_forward, activation_derivative_function);
     managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
     //multiplyMatricesSameDimensionsVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_auxiliar_error_forward_layer, d_forward);
@@ -182,11 +225,12 @@ void Layer::backward(cudaStream_t stream, float** input_pointers, int num_output
     productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
     //weight error
     productoMatricesTrasposedABatchDevice(*handle, input_pointers, d_auxiliar_error_forward_layer_pointers, d_error_weight_matrices_pointers, input_size, num_outputs, size, number_networks);
+    */
 }
 
 void Layer::applyGradientSGD(cudaStream_t stream, float lrate) {
-    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(input_size * size * number_networks), d_error_array_weight_matrix, lrate);
-    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * number_networks), d_error_array_bias_vector, lrate);
+    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(input_size * size * number_networks), d_error_array_weight_matrix, -lrate);
+    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * number_networks), d_error_array_bias_vector, -lrate);
     managedSumVectorsSameDimensions(stream, max_num_threads, nextFourMultiple(input_size * size * number_networks), d_array_weight_matrix, d_error_array_weight_matrix);
     managedSumVectorsSameDimensions(stream, max_num_threads, nextFourMultiple(size * number_networks), d_array_bias_vector, d_error_array_bias_vector);
 }
