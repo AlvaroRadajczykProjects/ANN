@@ -52,6 +52,8 @@ int main() {
     cudaGetSymbolAddress((void**)&d_func2, d_dMSE);
     func2_t dMSE = getDeviceSymbolInGlobalMemory(d_func2);
 
+
+
     /*
     Layer* l1 = new Layer(2, ELU, dELU);
     Layer* l2 = new Layer(1, Linear, dLinear);
@@ -115,7 +117,7 @@ int main() {
 
     //INTENTO DE ENTRENAMIENTO
 
-    ///*
+    /*
 
     Network* n = new Network(2, 1, 3, new Layer * [3] {
         new Layer(10, ELU, dELU),
@@ -125,7 +127,7 @@ int main() {
 
     n->initWeightBiasValues();
 
-    n->showWeightsBiasesLayers();
+    //n->showWeightsBiasesLayers();
 
     float* input = new float[4*2] { 0, 0, 0, 1, 1, 0, 1, 1 };
     float* output = new float[4*1] { 0, 1, 1, 0 };
@@ -144,11 +146,9 @@ int main() {
         //n->showForwardMatrices();
         //n->showErrorWeightsBiasesLayers();
         err = n->backwardPhase(4, 4, new int[1] {0})[0];
-        if(i == 0 || (i+1)%500 == 0){ printf("\nError %d: %f", i+1, err); }
-        n->applyVGradSGD(0.1);
+        if(i == 0 || (i+1)%500 == 0){ printf("\nError %d: %.20f", i+1, err); }
+        n->applyVGradSGD(0.01);
     }
-
-    n->showWeightsBiasesLayers();
 
     float* res = new float[4];
     //n->forward(1, new float[2 * 4] { 0, 0, 0, 1, 1, 0, 1, 1 }, res);
@@ -158,7 +158,7 @@ int main() {
     n->finalizeForward();
 
     delete n;
-    //*/
+    */
 
     /*
     Network* n = new Network(256, 2, 3, new Layer * [3] {
