@@ -52,39 +52,7 @@ int main() {
     cudaGetSymbolAddress((void**)&d_func2, d_dMSE);
     func2_t dMSE = getDeviceSymbolInGlobalMemory(d_func2);
 
-
-
-    /*
-    Layer* l1 = new Layer(2, ELU, dELU);
-    Layer* l2 = new Layer(1, Linear, dLinear);
-
-    Network* n = new Network(2, 2, 2, new Layer* [2]{
-        l1,
-        l2
-    }, MSE, dMSE);
-
-    l1->copyWeightBias(new float[8] {1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509, 1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509}, new float[4] {-1.1172228848589787, 5.448566789132996e-10, -1.1172228848589787, 5.448566789132996e-10});
-    l2->copyWeightBias(new float[4] {-1.9048641164238775, 1.2619510820705655, -1.9048641164238775, 1.2619510820705655}, new float[2] {-0.12816004082232135, -0.12816004082232135});
-
-    n->showInfoAboutNetwork();
-    n->showWeightsBiasesLayers();
-
-    float* res = new float[4];
-
-    n->initForward(1);
-
-    n->showAuxiliarExpandReduceMatrices();
-
-    n->forward(1, new float[2 * 1] { 1, 1 }, res);
-
-    n->showForwardMatrices();
-
-    imprimirMatrizPorPantalla("Resultado forward host: ", res, 1, 1);
-
-    n->finalizeForward();
-
-    delete n;
-    */
+    //FORWARD UNA RED VARIOS EJEMPLOS A LA VEZ
 
     /*
     Layer* l1 = new Layer(2, ELU, dELU);
@@ -115,7 +83,7 @@ int main() {
     delete n;
     */
 
-    //INTENTO DE ENTRENAMIENTO
+    //ENTRENAMIENTO UNA SOLA RED
 
     /*
 
@@ -150,8 +118,6 @@ int main() {
         n->applyVGradSGD(0.01);
     }
 
-    float* res = new float[4];
-    //n->forward(1, new float[2 * 4] { 0, 0, 0, 1, 1, 0, 1, 1 }, res);
     n->forwardTrain(4);
     n->showForwardMatrices();
 
@@ -159,6 +125,82 @@ int main() {
 
     delete n;
     */
+
+    //ENTRENAMIENTO VARIAS REDES
+
+    /*
+
+    Network* n = new Network(2, 2, 3, new Layer * [3] {
+        new Layer(10, ELU, dELU),
+        new Layer(10, ELU, dELU),
+        new Layer(1, Linear, dLinear),
+    }, MSE, dMSE);
+
+    n->initWeightBiasValues();
+
+    float* input = new float[4*2] { 0, 0, 0, 1, 1, 0, 1, 1 };
+    float* output = new float[4*1] { 0, 1, 1, 0 };
+
+    n->initForwardTrain(4, 4);
+
+    n->copyInputOutputTrain(4, input, output);
+    float* errs;
+    int* indx = new int[2] {0, 0};
+
+    n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
+    n->showForwardMatrices();
+
+    int niter = 20000;
+    int mostrar_cada = 500;
+    for (int i = 0; i < niter; i++) {
+        errs = n->backwardPhase(4, 4, indx);
+        if (i == 0 || (i + 1) % mostrar_cada == 0) { printf("\nErrores %d: %.20f, %.20f", i + 1, errs[0], errs[1]); }
+        n->applyVGradSGD(0.01);
+    }
+
+    n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
+    n->showForwardMatrices();
+
+    n->finalizeForward();
+
+    delete n;
+    */
+
+    //PRUEBA FUNCIONAMIENTO FORWARD
+
+    /*
+    Layer* l1 = new Layer(2, ELU, dELU);
+    Layer* l2 = new Layer(1, Linear, dLinear);
+
+    Network* n = new Network(2, 2, 2, new Layer* [2]{
+        l1,
+        l2
+    }, MSE, dMSE);
+
+    l1->copyWeightBias(new float[8] {1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509, 1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509}, new float[4] {-1.1172228848589787, 5.448566789132996e-10, -1.1172228848589787, 5.448566789132996e-10});
+    l2->copyWeightBias(new float[4] {-1.9048641164238775, 1.2619510820705655, -1.9048641164238775, 1.2619510820705655}, new float[2] {-0.12816004082232135, -0.12816004082232135});
+
+    n->showInfoAboutNetwork();
+    n->showWeightsBiasesLayers();
+
+    float* res = new float[4];
+
+    n->initForward(1);
+
+    n->showAuxiliarExpandReduceMatrices();
+
+    n->forward(1, new float[2 * 1] { 1, 1 }, res);
+
+    n->showForwardMatrices();
+
+    imprimirMatrizPorPantalla("Resultado forward host: ", res, 1, 1);
+
+    n->finalizeForward();
+
+    delete n;
+    */
+
+    //PRUEBA VELOCIDAD FORWARD
 
     /*
     Network* n = new Network(256, 2, 3, new Layer * [3] {

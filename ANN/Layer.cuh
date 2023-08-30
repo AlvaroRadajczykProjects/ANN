@@ -51,6 +51,8 @@ class Layer {
         //será la matriz de device de tamaño max(nelems_entrada+nelems_salida, nelems_mayor_capa_salida)
         float* d_auxiliar_error_forward_layer = NULL;
         float** d_auxiliar_error_forward_layer_pointers = NULL;
+        float** hd_auxiliar_error_forward_layer_pointers = NULL;
+        float** hd_auxiliar2_error_forward_layer_pointers = NULL;
         float* d_auxiliar2_error_forward_layer = NULL;
         float** d_auxiliar2_error_forward_layer_pointers = NULL;
 
@@ -75,6 +77,7 @@ class Layer {
         float** getDeviceForwardPointers();
         float** getAuxiliarExpandReduceMatrixPointers();
         float** getDeviceAuxiliarErrorForwardLayerPointers();
+        float** getDeviceAuxiliar2ErrorForwardLayerPointers();
 
         void setMaxNumThreads(int set);
         void setInputSize(int is);

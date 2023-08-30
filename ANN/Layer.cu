@@ -24,51 +24,53 @@ void Layer::showInfo() {
 }
 
 void Layer::showWeightBias() {
+    float* h_weight_m = new float[input_size * size];
+    float* h_bias_v = new float[size];
     for (int i = 0; i < number_networks; i++) {
-        float* h_weight_m = new float[input_size * size];
-        float* h_bias_v = new float[size];
         cudaMemcpy(h_weight_m, hd_weight_matrices_pointers[i], input_size * size * sizeof(float), cudaMemcpyDeviceToHost);
         cudaMemcpy(h_bias_v, hd_bias_vectors_pointers[i], size * sizeof(float), cudaMemcpyDeviceToHost);
         printf("\n\tNetwork %d:", i);
         imprimirMatrizPorPantalla("\n\t\tbias:", h_bias_v, 1, size);
-        imprimirMatrizPorPantalla("\n\t\tweight:", h_weight_m, input_size, size);
-        delete h_weight_m;
-        delete h_bias_v;
+        imprimirMatrizPorPantalla("\n\t\tweight:", h_weight_m, input_size, size); 
     }
+    delete h_weight_m;
+    delete h_bias_v;
 }
 
 void Layer::showErrorWeightBias() {
+    float* h_weight_m = new float[input_size * size];
+    float* h_bias_v = new float[size];
     for (int i = 0; i < number_networks; i++) {
-        float* h_weight_m = new float[input_size * size];
-        float* h_bias_v = new float[size];
         cudaMemcpy(h_weight_m, hd_error_weight_matrices_pointers[i], input_size * size * sizeof(float), cudaMemcpyDeviceToHost);
         cudaMemcpy(h_bias_v, hd_error_bias_vectors_pointers[i], size * sizeof(float), cudaMemcpyDeviceToHost);
         printf("\n\tNetwork %d:", i);
         imprimirMatrizPorPantalla("\n\t\tbias:", h_bias_v, 1, size);
         imprimirMatrizPorPantalla("\n\t\tweight:", h_weight_m, input_size, size);
-        delete h_weight_m;
-        delete h_bias_v;
     }
+    delete h_weight_m;
+    delete h_bias_v;
 }
 
 void Layer::showAuxiliarExpandReduce() {
+    float* h_auxiliar_expand_reduce_matrix = new float[size];
     for (int i = 0; i < number_networks; i++) {
-        float* h_auxiliar_expand_reduce_matrix = new float[size];
         cudaMemcpy(h_auxiliar_expand_reduce_matrix, hd_expand_reduce_matrix_pointers[i], size * sizeof(float), cudaMemcpyDeviceToHost);
         printf("\n\tNetwork %d:", i);
         imprimirMatrizPorPantalla("\n\t\tauxiliar:", h_auxiliar_expand_reduce_matrix, 1, size);
-        delete h_auxiliar_expand_reduce_matrix;
+        
     }
+    delete h_auxiliar_expand_reduce_matrix;
 }
 
 void Layer::showForward() {
+    float* h_forward = new float[number_input_examples * size];
     for (int i = 0; i < number_networks; i++) {
-        float* h_forward = new float[number_input_examples * size];
         cudaMemcpy(h_forward, hd_forward_pointers[i], number_input_examples * size * sizeof(float), cudaMemcpyDeviceToHost);
         printf("\n\tNetwork %d:", i);
         imprimirMatrizPorPantalla("\n\t\tforward matrix:", h_forward, number_input_examples, size);
-        delete h_forward;
+        
     }
+    delete h_forward;
 }
 
 int Layer::getSize() {
@@ -90,6 +92,10 @@ float** Layer::getAuxiliarExpandReduceMatrixPointers() {
 
 float** Layer::getDeviceAuxiliarErrorForwardLayerPointers() {
     return d_auxiliar_error_forward_layer_pointers;
+}
+
+float** Layer::getDeviceAuxiliar2ErrorForwardLayerPointers() {
+    return d_auxiliar2_error_forward_layer_pointers;
 }
 
 void Layer::setMaxNumThreads(int set) {
@@ -158,15 +164,11 @@ void Layer::forward(cudaStream_t stream, Layer* previous_layer, int num_inputs) 
 void Layer::backward(cudaStream_t stream, Layer* previous_layer, int num_outputs) {
 
     managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
-    
+
     managedMultiplyMatricesSameDimensions(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, d_forward);
 
     managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, 1 / (float)num_outputs);
 
-    //float* h_res = new float[nextFourMultiple(max(input_size, size) * num_outputs * number_networks)];
-    //cudaMemcpy(h_res, d_auxiliar_error_forward_layer, nextFourMultiple(size * num_outputs * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
-    //imprimirMatrizPorPantalla("bias nada mas ser calculado: ", h_res, num_outputs * number_networks, size);
-
     //bias error
     productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
 
@@ -174,28 +176,62 @@ void Layer::backward(cudaStream_t stream, Layer* previous_layer, int num_outputs
     productoMatricesTrasposedABatchDevice(*handle, previous_layer->getDeviceForwardPointers(), d_auxiliar_error_forward_layer_pointers, d_error_weight_matrices_pointers, input_size, num_outputs, size, number_networks);
 
     //previous layer error
-    productoMatricesTrasposedBBatchDevice(*handle, d_auxiliar_error_forward_layer_pointers, d_weight_matrices_pointers, d_auxiliar2_error_forward_layer_pointers, num_outputs, size, input_size, number_networks);
+    productoMatricesTrasposedBBatchDevice(*handle, d_auxiliar_error_forward_layer_pointers, d_weight_matrices_pointers, previous_layer->getDeviceAuxiliar2ErrorForwardLayerPointers(), num_outputs, size, input_size, number_networks);
+    cudaMemcpy(d_auxiliar_error_forward_layer, d_auxiliar2_error_forward_layer, nextFourMultiple(num_outputs * input_size * number_networks) * sizeof(float), cudaMemcpyDeviceToDevice);
+
+    /*
+    float* h_res = new float[nextFourMultiple(num_outputs * max(size, input_size) * number_networks)];
+
+    managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
+    
+    cudaMemcpy(h_res, d_forward, nextFourMultiple(size * num_outputs * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("aplico la funcion: ", h_res, num_outputs * number_networks, size);
+
+    managedMultiplyMatricesSameDimensions(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, d_forward);
+
+    cudaMemcpy(h_res, d_auxiliar_error_forward_layer, nextFourMultiple(size * num_outputs * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("multiplico aplicar funcion por error: ", h_res, num_outputs * number_networks, size);
+
+    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, 1 / (float)num_outputs);
+
+    cudaMemcpy(h_res, d_auxiliar_error_forward_layer, nextFourMultiple(size * num_outputs * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("divido todos los elementos entre la constante: ", h_res, num_outputs * number_networks, size);
+
+    //bias error
+    productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
+
+    cudaMemcpy(h_res, d_error_array_bias_vector, nextFourMultiple(size * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("bias error: ", h_res, number_networks, size);
+
+    //weight error
+    productoMatricesTrasposedABatchDevice(*handle, previous_layer->getDeviceForwardPointers(), d_auxiliar_error_forward_layer_pointers, d_error_weight_matrices_pointers, input_size, num_outputs, size, number_networks);
+
+    cudaMemcpy(h_res, d_error_array_weight_matrix, nextFourMultiple(input_size * size * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("weight error: ", h_res, input_size* number_networks, size);
+
+    //previous layer error
+    productoMatricesTrasposedBBatchDevice(*handle, d_auxiliar_error_forward_layer_pointers, d_weight_matrices_pointers, previous_layer->getDeviceAuxiliar2ErrorForwardLayerPointers(), num_outputs, size, input_size, number_networks);
     cudaMemcpy(d_auxiliar_error_forward_layer, d_auxiliar2_error_forward_layer, nextFourMultiple(num_outputs * input_size * number_networks) * sizeof(float), cudaMemcpyDeviceToDevice);
     
-    /*
-    //applyFunctionVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_forward, activation_derivative_function);
-    managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
-    //multiplyMatricesSameDimensionsVectorial << < num_blocks_needed_apply_function, num_threads_needed_apply_function, 0, stream >> > (d_auxiliar_error_forward_layer, d_forward);
-    managedMultiplyMatricesSameDimensions( stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, d_forward);
-    //multiplyAllElementsByConstantVectorial << < (int) ceil(nextFourMultiple(num_outputs) / ((float)max_num_threads * 4)), min(max_num_threads, (int)(nextFourMultiple(number_networks * size) / (float)4)), 0, stream >> > (d_error_array_bias_vector, 1 / (float)num_outputs);
-    managedMultiplyAllElementsByConstant(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, 1 / (float)num_outputs);
-    //bias error
-    productoMatricesBatchDevice(*handle, d_expand_reduce_matrix_pointers, d_auxiliar_error_forward_layer_pointers, d_error_bias_vectors_pointers, 1, num_outputs, size, number_networks);
-    //weight error
-    productoMatricesTrasposedABatchDevice(*handle, previous_layer->getDeviceForwardPointers(), d_auxiliar_error_forward_layer_pointers, d_error_weight_matrices_pointers, input_size, num_outputs, size, number_networks);
-    //previous layer error
-    productoMatricesTrasposedBBatchDevice(*handle, d_auxiliar_error_forward_layer_pointers, d_weight_matrices_pointers, d_auxiliar2_error_forward_layer_pointers, num_outputs, size, input_size, number_networks);
-    cudaMemcpy(d_auxiliar_error_forward_layer, d_auxiliar2_error_forward_layer, nextFourMultiple(num_outputs * input_size * number_networks) * sizeof(float), cudaMemcpyDeviceToDevice);
+    //printf("\nDIMENSIONES DE LAS MATRICES RESULTADO DE ERROR HACIA ATRAS: %d %d", num_outputs, input_size);
+    //float** punteros = new float* [number_networks];
+    //cudaMemcpy(punteros, d_auxiliar_error_forward_layer_pointers, number_networks * sizeof(float*), cudaMemcpyDeviceToHost);
+    //for (int i = 0; i < number_networks; i++) { printf("\nPOS POINTER AUX1: %p", punteros[i]); }
+    //cudaMemcpy(punteros, d_auxiliar2_error_forward_layer_pointers, number_networks * sizeof(float*), cudaMemcpyDeviceToHost);
+    //for (int i = 0; i < number_networks; i++) { printf("\nPOS POINTER AUX2: %p", punteros[i]); }
+
+    cudaMemcpy(h_res, d_auxiliar_error_forward_layer, nextFourMultiple(input_size * num_outputs * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("error a propagar hacia atras calculado: ", h_res, num_outputs * number_networks, input_size);
     */
+
 }
 
 void Layer::backward(cudaStream_t stream, float** input_pointers, int num_outputs) {
     
+    /*float* h_res = new float[nextFourMultiple(num_outputs * input_size * number_networks)];
+    cudaMemcpy(h_res, d_auxiliar_error_forward_layer, nextFourMultiple(size * num_outputs * number_networks) * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("error que tomo del calculo anterior: ", h_res, num_outputs * number_networks, size);*/
+
     managedApplyFunction(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_forward, activation_derivative_function);
 
     managedMultiplyMatricesSameDimensions(stream, max_num_threads, nextFourMultiple(size * num_outputs * number_networks), d_auxiliar_error_forward_layer, d_forward);
@@ -301,8 +337,8 @@ void Layer::allocBackwardMemory(int batch_size, float* d_aux_error_matrix, float
     cudaMalloc( &d_error_array_bias_vector, nextFourMultiple(size * number_networks) * sizeof(float));
     hd_error_weight_matrices_pointers = new float* [number_networks];
     hd_error_bias_vectors_pointers = new float* [number_networks];
-    float** hd_auxiliar_error_forward_layer_pointers = new float* [number_networks];
-    float** hd_auxiliar2_error_forward_layer_pointers = new float* [number_networks];
+    hd_auxiliar_error_forward_layer_pointers = new float* [number_networks];
+    hd_auxiliar2_error_forward_layer_pointers = new float* [number_networks];
     cudaMalloc(&d_auxiliar_error_forward_layer_pointers, number_networks * sizeof(float*));
     cudaMalloc(&d_auxiliar2_error_forward_layer_pointers, number_networks * sizeof(float*));
     cudaMalloc(&d_error_weight_matrices_pointers, number_networks * sizeof(float*));
@@ -312,18 +348,21 @@ void Layer::allocBackwardMemory(int batch_size, float* d_aux_error_matrix, float
         hd_error_bias_vectors_pointers[i] = d_error_array_bias_vector + i * (size);
         hd_auxiliar_error_forward_layer_pointers[i] = d_auxiliar_error_forward_layer + i * (size * batch_size);
         hd_auxiliar2_error_forward_layer_pointers[i] = d_auxiliar2_error_forward_layer + i * (size * batch_size);
+        //printf("\nDISTANCIA SUMADA RED %d: %d", i, i * (size * batch_size));
+        //printf("\nPosicion hd_auxiliar_error_forward_layer_pointers: %p", hd_auxiliar_error_forward_layer_pointers[i]);
+        //printf("\nPosicion hd_auxiliar2_error_forward_layer_pointers: %p", hd_auxiliar2_error_forward_layer_pointers[i]);
     }
     cudaMemcpy(d_error_weight_matrices_pointers, hd_error_weight_matrices_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
     cudaMemcpy(d_error_bias_vectors_pointers, hd_error_bias_vectors_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
     cudaMemcpy(d_auxiliar_error_forward_layer_pointers, hd_auxiliar_error_forward_layer_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
     cudaMemcpy(d_auxiliar2_error_forward_layer_pointers, hd_auxiliar2_error_forward_layer_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
-    delete hd_auxiliar_error_forward_layer_pointers;
-    delete hd_auxiliar2_error_forward_layer_pointers;
 }
 
 void Layer::freeBackwardMemory() {
     d_auxiliar_error_forward_layer = NULL;
     d_auxiliar2_error_forward_layer = NULL;
+    if (hd_auxiliar_error_forward_layer_pointers != NULL) { delete hd_auxiliar_error_forward_layer_pointers; hd_auxiliar_error_forward_layer_pointers = NULL; }
+    if (hd_auxiliar2_error_forward_layer_pointers != NULL) { delete hd_auxiliar2_error_forward_layer_pointers; hd_auxiliar2_error_forward_layer_pointers = NULL; }
     if (d_auxiliar_error_forward_layer_pointers != NULL) { cudaFree(d_auxiliar_error_forward_layer_pointers); d_auxiliar_error_forward_layer_pointers = NULL; }
     if (d_auxiliar2_error_forward_layer_pointers != NULL) { cudaFree(d_auxiliar2_error_forward_layer_pointers); d_auxiliar2_error_forward_layer_pointers = NULL; }
     if (d_error_array_weight_matrix != NULL) { cudaFree(d_error_array_weight_matrix); d_error_array_weight_matrix = NULL; }
