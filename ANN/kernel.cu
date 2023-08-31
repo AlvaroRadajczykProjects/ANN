@@ -52,6 +52,74 @@ int main() {
     cudaGetSymbolAddress((void**)&d_func2, d_dMSE);
     func2_t dMSE = getDeviceSymbolInGlobalMemory(d_func2);
 
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    Network* n = new Network(2, 5, 3, new Layer * [3] {
+        new Layer(10, ELU, dELU),
+            new Layer(10, ELU, dELU),
+            new Layer(1, Linear, dLinear),
+    }, MSE, dMSE);
+
+    n->initWeightBiasValues();
+
+    float* input = new float[4 * 2] { 0, 0, 0, 1, 1, 0, 1, 1 };
+    float* output = new float[4 * 1] { 1, 0, 0, 1 };
+
+    float* input_val = new float[4 * 2] { 0, 0, 0, 1, 1, 0, 1, 1 };
+    float* output_val = new float[4 * 1] { 0, 1, 1, 0 };
+
+    n->initForwardTrain(4, 4, 4);
+
+    n->copyInputOutputTrain(4, input, output);
+    n->copyInputOutputValidation(4, input_val, output_val);
+
+    float* errs;
+    float* errs_val;
+
+    int* indx = new int[5] {0, 0, 0, 0, 0};
+
+    //n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
+    //n->showForwardMatrices();
+
+    int niter = 20000;
+    int mostrar_cada = 500;
+    for (int i = 0; i < niter; i++) {
+        errs = n->backwardPhase(4, 4, indx);
+        n->applyVGradSGD(0.01);
+        errs_val = n->validationGetCostFunctionAndCalculateLossFunction(4, 4, indx);
+        if (i == 0 || (i + 1) % mostrar_cada == 0) { 
+            printf("\nITERACION %d:", i + 1);
+            for (int j = 0; j < 5; j++) {
+                printf("\n\tRED %j-> err train: %.20f  err test: %.20f", errs[j], errs_val[j]);
+            }
+            printf("\n");
+        }
+        delete errs;
+        delete errs_val;
+    }
+
+    n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
+    n->showForwardMatrices();
+
+    n->finalizeForwardBackward();
+
+    delete n;
+
+    /*
+    int* nums = new int[20];
+    for (int i = 0; i < 20; i++) { nums[i] = i; }
+    
+    printf("\n");
+    for (int i = 0; i < 20; i++) { printf(" %d,", nums[i]); }
+    printf("\n");
+
+    edu_shuffle(nums, 20);
+
+    printf("\n");
+    for (int i = 0; i < 20; i++) { printf(" %d,", nums[i]); }
+    printf("\n");
+    */
+
     //FORWARD UNA RED VARIOS EJEMPLOS A LA VEZ
 
     /*
@@ -78,7 +146,7 @@ int main() {
 
     n->showForwardMatrices();
 
-    n->finalizeForward();
+    n->finalizeForwardBackward();
 
     delete n;
     */
@@ -100,7 +168,7 @@ int main() {
     float* input = new float[4*2] { 0, 0, 0, 1, 1, 0, 1, 1 };
     float* output = new float[4*1] { 0, 1, 1, 0 };
 
-    n->initForwardTrain(4, 4);
+    n->initForwardTrain(4, 0, 4);
 
     //n->showAuxiliarExpandReduceMatrices();
 
@@ -121,7 +189,7 @@ int main() {
     n->forwardTrain(4);
     n->showForwardMatrices();
 
-    n->finalizeForward();
+    n->finalizeForwardBackward();
 
     delete n;
     */
@@ -130,7 +198,7 @@ int main() {
 
     /*
 
-    Network* n = new Network(2, 2, 3, new Layer * [3] {
+    Network* n = new Network(2, 5, 3, new Layer * [3] {
         new Layer(10, ELU, dELU),
         new Layer(10, ELU, dELU),
         new Layer(1, Linear, dLinear),
@@ -139,13 +207,13 @@ int main() {
     n->initWeightBiasValues();
 
     float* input = new float[4*2] { 0, 0, 0, 1, 1, 0, 1, 1 };
-    float* output = new float[4*1] { 0, 1, 1, 0 };
+    float* output = new float[4*1] { 1, 0, 0, 1 };
 
-    n->initForwardTrain(4, 4);
+    n->initForwardTrain(4, 0, 4);
 
     n->copyInputOutputTrain(4, input, output);
     float* errs;
-    int* indx = new int[2] {0, 0};
+    int* indx = new int[5] {0, 0, 0, 0, 0};
 
     n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
     n->showForwardMatrices();
@@ -154,14 +222,15 @@ int main() {
     int mostrar_cada = 500;
     for (int i = 0; i < niter; i++) {
         errs = n->backwardPhase(4, 4, indx);
-        if (i == 0 || (i + 1) % mostrar_cada == 0) { printf("\nErrores %d: %.20f, %.20f", i + 1, errs[0], errs[1]); }
+        if (i == 0 || (i + 1) % mostrar_cada == 0) { printf("\nErrores %d: %.20f %.20f %.20f %.20f %.20f", i + 1, errs[0], errs[1], errs[2], errs[3], errs[4]); }
         n->applyVGradSGD(0.01);
+        delete errs;
     }
 
     n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
     n->showForwardMatrices();
 
-    n->finalizeForward();
+    n->finalizeForwardBackward();
 
     delete n;
     */
@@ -195,7 +264,7 @@ int main() {
 
     imprimirMatrizPorPantalla("Resultado forward host: ", res, 1, 1);
 
-    n->finalizeForward();
+    n->finalizeForwardBackward();
 
     delete n;
     */
@@ -229,7 +298,7 @@ int main() {
         std::cout << "elapsed time: " << elapsed_seconds.count() << "s; " << elapsed_seconds.count() * 1000 << "ms\n";
     }
 
-    n->finalizeForward();
+    n->finalizeForwardBackward();
 
     delete n;
     */

@@ -8,6 +8,9 @@
 
 #include <cublas_v2.h>
 
+#include <algorithm>
+#include <array>
+#include <chrono>
 #include <random>
 #include <time.h>
 #include <curand.h>
@@ -23,6 +26,8 @@ using func3_t = float(*) (float, float, float);
 const float alpha = 1.0f; //aparte del producto entre los elementos, puedes multiplicar esto
 const float beta_sum = 1.0f; //aparte del producto final, puedes sumar esto
 const float beta_nosum = 0.0f; //aparte del producto final, puedes sumar esto
+
+void edu_shuffle(int arr[], int n);
 
 void manageCUDAError(cudaError_t status, char* description);
 

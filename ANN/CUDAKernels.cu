@@ -1,5 +1,12 @@
 #include "CUDAKernels.cuh"
 
+using namespace std;
+
+void edu_shuffle(int arr[], int n) {
+    unsigned semilla = rand() % 10000;
+    shuffle(arr, arr + n, default_random_engine(semilla));
+}
+
 void manageCUDAError(cudaError_t status, char* description) {
     if (status != cudaSuccess) {
         fprintf(stderr, "Error de CUDA %s: %s\n", description, cudaGetErrorString(status));
@@ -132,8 +139,8 @@ const void managedApplyFunction(cudaStream_t stream, int max_num_threads, int nu
     num_elems -= (nblocks * 4 * max_num_threads);
     int offset = (nblocks * 4 * max_num_threads);
     applyFunctionVectorial << < 1, (int) (num_elems/4), 0, stream >> > (arr + offset, func);
-    num_elems -= (num_elems / 4) * 4;
     offset += ((num_elems / 4) * 4);
+    num_elems -= (num_elems / 4) * 4;
     applyFunctionScalar << < 1, num_elems%4, 0, stream >> > (arr + offset, func);
 }
 
@@ -143,8 +150,8 @@ const void managedApplyLossFunction(cudaStream_t stream, int max_num_threads, in
     num_elems -= (nblocks * 4 * max_num_threads);
     int offset = (nblocks * 4 * max_num_threads);
     applyLossFunctionVectorial << < 1, (int)(num_elems / 4), 0, stream >> > (pred+ offset, real+ offset, dst+ offset, func);
-    num_elems -= (num_elems / 4) * 4;
     offset += ((num_elems / 4) * 4);
+    num_elems -= (num_elems / 4) * 4;
     applyLossFunctionScalar << < 1, num_elems % 4, 0, stream >> > (pred + offset, real + offset, dst + offset, func);
 }
 
@@ -154,8 +161,8 @@ const void managedMultiplyAllElementsByConstant(cudaStream_t stream, int max_num
     num_elems -= (nblocks * 4 * max_num_threads);
     int offset = (nblocks * 4 * max_num_threads);
     multiplyAllElementsByConstantVectorial << < 1, (int)(num_elems / 4), 0, stream >> > (arr + offset, ct);
-    num_elems -= (num_elems / 4) * 4;
     offset += ((num_elems / 4) * 4);
+    num_elems -= (num_elems / 4) * 4;
     multiplyAllElementsByConstantScalar << < 1, num_elems % 4, 0, stream >> > (arr + offset, ct);
 }
 
@@ -165,8 +172,8 @@ const void managedSumVectorsSameDimensions(cudaStream_t stream, int max_num_thre
     num_elems -= (nblocks * 4 * max_num_threads);
     int offset = (nblocks * 4 * max_num_threads);
     sumVectorsSameDimensionsVectorial << < 1, (int)(num_elems / 4), 0, stream >> > (dst + offset, src + offset);
-    num_elems -= (num_elems / 4) * 4;
     offset += ((num_elems / 4) * 4);
+    num_elems -= (num_elems / 4) * 4;
     sumVectorsSameDimensionsScalar << < 1, num_elems % 4, 0, stream >> > (dst + offset, src + offset);
 }
 
@@ -176,7 +183,7 @@ const void managedMultiplyMatricesSameDimensions(cudaStream_t stream, int max_nu
     num_elems -= (nblocks * 4 * max_num_threads);
     int offset = (nblocks * 4 * max_num_threads);
     multiplyMatricesSameDimensionsVectorial << < 1, (int)(num_elems / 4), 0, stream >> > (dst + offset, src + offset);
-    num_elems -= (num_elems / 4) * 4;
     offset += ((num_elems / 4) * 4);
+    num_elems -= (num_elems / 4) * 4;
     multiplyMatricesSameDimensionsScalar << < 1, num_elems % 4, 0, stream >> > (dst + offset, src + offset);
 }

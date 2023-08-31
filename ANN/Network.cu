@@ -22,7 +22,7 @@ Network::Network(int is, int nn, int nl, Layer** ls, func2_t ls_fn, func2_t dls_
 		layers[i]->setNumberNetworks(number_networks);
 		layers[i]->setIsTraining(false);
 		if (i == 0) { layers[i]->setInputSize(input_size); }
-		else { layers[i]->setInputSize(layers[i-1]->getSize()); }
+		else { layers[i]->setInputSize(layers[i - 1]->getSize()); }
 		layers[i]->setMaxNumThreads(max_num_threads);
 		layers[i]->allocWeightMatricesMemory();
 	}
@@ -62,7 +62,7 @@ void Network::showWeightsBiasesLayers() {
 	printf("\nWEIGHTS AND BIASES");
 	printf("\n==================");
 	for (int i = 0; i < number_layers; i++) {
-		printf("\nLayer %d:",i);
+		printf("\nLayer %d:", i);
 		layers[i]->showWeightBias();
 	}
 	printf("\n");
@@ -107,21 +107,23 @@ int Network::getNumberNetwors() {
 }
 
 void Network::initForward(int max_num_input_examples_expected) {
-	max_input_number_examples = max_num_input_examples_expected;
-	d_pinned_output_offset = input_size * max_input_number_examples;
+	max_train_number_examples = max_num_input_examples_expected;
+
 	cudaStreamCreate(&stream_principal);
 	cudaStreamCreate(&stream_transferencia_output);
 	cublasSetStream_v2(handle, stream_principal);
-	cudaHostAlloc(&h_pinned_input_matrix, input_size * max_input_number_examples * sizeof(float), cudaHostAllocWriteCombined);
-	cudaHostAlloc(&h_pinned_output_matrix, output_size * max_input_number_examples * sizeof(float), cudaHostAllocWriteCombined);
-	cudaMalloc(&d_pinned_input_output_auxiliar_matrix, max_input_number_examples * ( input_size + output_size) * sizeof(float));
+
+	cudaHostAlloc(&h_pinned_input_train_matrix, input_size * max_train_number_examples * sizeof(float), cudaHostAllocWriteCombined);
+	cudaHostAlloc(&h_pinned_output_train_matrix, output_size * max_train_number_examples * sizeof(float), cudaHostAllocWriteCombined);
+	cudaMalloc(&d_pinned_input_train_matrix, nextFourMultiple(input_size * max_train_number_examples) * sizeof(float));
+	cudaMalloc(&d_pinned_output_train_matrix, nextFourMultiple(output_size * max_train_number_examples) * sizeof(float));
 
 	float** hd_input_pointers = new float* [number_networks];
-	for (int i = 0; i < number_networks; i++) { hd_input_pointers[i] = d_pinned_input_output_auxiliar_matrix + 0; }
-	cudaMalloc(&d_input_pointers, number_networks*sizeof(float*));
-	cudaMemcpy(d_input_pointers, hd_input_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
+	for (int i = 0; i < number_networks; i++) { hd_input_pointers[i] = d_pinned_input_train_matrix + 0; }
+	cudaMalloc(&d_input_train_pointers, number_networks * sizeof(float*));
+	cudaMemcpy(d_input_train_pointers, hd_input_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
 	delete hd_input_pointers;
-	
+
 	int tam = nextFourMultiple(max(max(max_batch_size, number_networks), output_size));
 	cudaMalloc(&d_auxiliar_expand_reduce_matrix, tam * sizeof(float));
 	float* h_auxiliar_expand_reduce_matrix = new float[tam];
@@ -129,12 +131,12 @@ void Network::initForward(int max_num_input_examples_expected) {
 	cudaMemcpy(d_auxiliar_expand_reduce_matrix, h_auxiliar_expand_reduce_matrix, tam * sizeof(float), cudaMemcpyHostToDevice);
 	delete h_auxiliar_expand_reduce_matrix;
 	for (int i = 0; i < number_layers; i++) {
-		layers[i]->setNumberInputExamples(max_input_number_examples);
+		layers[i]->setNumberInputExamples(max_train_number_examples);
 		layers[i]->setAuxiliarExpandReduceMatrix(d_auxiliar_expand_reduce_matrix);
 		layers[i]->allocForwardMemory();
 	}
 
-	cudaMalloc(&d_output_forward_multiple_nn_sum, nextFourMultiple(number_networks * max_input_number_examples * output_size) * sizeof(float));
+	cudaMalloc(&d_output_forward_multiple_nn_sum, nextFourMultiple(number_networks * max_train_number_examples * output_size) * sizeof(float));
 
 	//Cublas warmup
 	productoMatricesDevice(handle, d_auxiliar_expand_reduce_matrix, layers[number_layers - 1]->getDeviceForward(), d_output_forward_multiple_nn_sum, 1, number_networks, output_size);
@@ -142,24 +144,49 @@ void Network::initForward(int max_num_input_examples_expected) {
 	cudaDeviceSynchronize();
 }
 
-void Network::initForwardTrain(int m_num_examples, int m_batch_size) {
+void Network::initForwardTrain(int max_train_examples, int max_validation_examples, int m_batch_size) {
+
+	if (m_batch_size > max_train_examples || (m_batch_size > max_validation_examples && max_validation_examples != 0)) {
+		printf("\nIn initForwardTrain: batch size cannot be bigger than max_train_examples and max_validation_examples if max_validation_examples != 0");
+		return;
+	}
+
+	if (max_train_examples < max_validation_examples) {
+		printf("\nIn initForwardTrain: max_train_examples must be equal or bigger than max_validation_examples");
+		return;
+	}
+
 	max_batch_size = m_batch_size;
-	max_input_number_examples = m_num_examples;
-	d_pinned_output_offset = input_size * max_input_number_examples;
+	max_train_number_examples = max_train_examples;
+	max_validation_number_examples = max_validation_examples;
+
 	cudaStreamCreate(&stream_principal);
 	cudaStreamCreate(&stream_transferencia_output);
 	cublasSetStream_v2(handle, stream_principal);
-	cudaHostAlloc(&h_pinned_input_matrix, input_size * max_input_number_examples * sizeof(float), cudaHostAllocWriteCombined);
-	cudaHostAlloc(&h_pinned_output_matrix, output_size * max_input_number_examples * sizeof(float), cudaHostAllocWriteCombined);
-	cudaMalloc(&d_pinned_input_output_auxiliar_matrix, ( d_pinned_output_offset + nextFourMultiple(max_input_number_examples * output_size) ) * sizeof(float));
+
+	cudaHostAlloc(&h_pinned_input_train_matrix, input_size * max_train_number_examples * sizeof(float), cudaHostAllocWriteCombined);
+	cudaHostAlloc(&h_pinned_output_train_matrix, output_size * max_train_number_examples * sizeof(float), cudaHostAllocWriteCombined);
+	cudaMalloc(&d_pinned_input_train_matrix, nextFourMultiple(input_size * max_train_number_examples) * sizeof(float));
+	cudaMalloc(&d_pinned_output_train_matrix, nextFourMultiple(output_size * max_train_number_examples) * sizeof(float));
+
+	cudaHostAlloc(&h_pinned_input_validation_matrix, input_size * max_validation_number_examples * sizeof(float), cudaHostAllocWriteCombined);
+	cudaHostAlloc(&h_pinned_output_validation_matrix, output_size * max_validation_number_examples * sizeof(float), cudaHostAllocWriteCombined);
+	cudaMalloc(&d_pinned_input_validation_matrix, nextFourMultiple(input_size * max_validation_number_examples) * sizeof(float));
+	cudaMalloc(&d_pinned_output_validation_matrix, nextFourMultiple(output_size * max_validation_number_examples) * sizeof(float));
 
 	float** hd_input_pointers = new float* [number_networks];
-	for (int i = 0; i < number_networks; i++) { hd_input_pointers[i] = d_pinned_input_output_auxiliar_matrix + 0; }
-	cudaMalloc(&d_input_pointers, number_networks * sizeof(float*));
-	cudaMemcpy(d_input_pointers, hd_input_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
+	for (int i = 0; i < number_networks; i++) { hd_input_pointers[i] = d_pinned_input_train_matrix + 0; }
+	cudaMalloc(&d_input_train_pointers, number_networks * sizeof(float*));
+	cudaMemcpy(d_input_train_pointers, hd_input_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
 	delete hd_input_pointers;
 
-	int tam = nextFourMultiple( max_batch_size * number_networks * output_size );
+	float** hd_input_val_pointers = new float* [number_networks];
+	for (int i = 0; i < number_networks; i++) { hd_input_val_pointers[i] = d_pinned_input_validation_matrix + 0; }
+	cudaMalloc(&d_input_validation_pointers, number_networks * sizeof(float*));
+	cudaMemcpy(d_input_validation_pointers, hd_input_val_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
+	delete hd_input_val_pointers;
+
+	int tam = nextFourMultiple(max_batch_size * number_networks * output_size);
 	cudaMalloc(&d_auxiliar_expand_reduce_matrix, tam * sizeof(float));
 	float* h_auxiliar_expand_reduce_matrix = new float[tam];
 	for (int i = 0; i < tam; i++) { h_auxiliar_expand_reduce_matrix[i] = 1.0f; }
@@ -181,7 +208,7 @@ void Network::initForwardTrain(int m_num_examples, int m_batch_size) {
 	cudaMalloc(&d_output_forward_multiple_nn_sum, nextFourMultiple(number_networks * max_batch_size * output_size) * sizeof(float));
 	float** hd_output_forward_multiple_nn_sum_pointers = new float* [number_networks];
 	cudaMalloc(&d_output_forward_multiple_nn_sum_pointers, number_networks * sizeof(float*));
-	for (int i = 0; i < number_networks; i++) { hd_output_forward_multiple_nn_sum_pointers[i] = d_output_forward_multiple_nn_sum + i*output_size; }
+	for (int i = 0; i < number_networks; i++) { hd_output_forward_multiple_nn_sum_pointers[i] = d_output_forward_multiple_nn_sum + i * output_size; }
 	cudaMemcpy(d_output_forward_multiple_nn_sum_pointers, hd_output_forward_multiple_nn_sum_pointers, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
 	delete hd_output_forward_multiple_nn_sum_pointers;
 
@@ -210,11 +237,11 @@ void Network::initWeightBiasValues() {
 }
 
 const void Network::copyInputOutputTrain(int num_examples, float* input_data, float* output_data) {
-	if (num_examples <= max_input_number_examples) {
-		cudaMemcpyAsync(h_pinned_input_matrix, input_data, num_examples * input_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
-		cudaMemcpyAsync(h_pinned_output_matrix, output_data, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_transferencia_output);
-		cudaMemcpyAsync(d_pinned_input_output_auxiliar_matrix, h_pinned_input_matrix, num_examples * input_size * sizeof(float), cudaMemcpyHostToDevice, stream_principal);
-		cudaMemcpyAsync(d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset, h_pinned_output_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToDevice, stream_transferencia_output);
+	if (num_examples <= max_train_number_examples) {
+		cudaMemcpyAsync(h_pinned_input_train_matrix, input_data, num_examples * input_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
+		cudaMemcpyAsync(h_pinned_output_train_matrix, output_data, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_transferencia_output);
+		cudaMemcpyAsync(d_pinned_input_train_matrix, h_pinned_input_train_matrix, num_examples * input_size * sizeof(float), cudaMemcpyHostToDevice, stream_principal);
+		cudaMemcpyAsync(d_pinned_output_train_matrix, h_pinned_output_train_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToDevice, stream_transferencia_output);
 		//cudaStreamSynchronize(stream_principal);
 		//cudaStreamSynchronize(stream_transferencia_output);
 		//para hacer el backward, esperaré a que ambas transferencias hayan terminado
@@ -222,8 +249,8 @@ const void Network::copyInputOutputTrain(int num_examples, float* input_data, fl
 		//input y output se copian bien, deberían de llegar a tiempo sin necesidad de sincronización
 		float* inputarr = new float[input_size * num_examples];
 		float* outputarr = new float[output_size * num_examples];
-		cudaMemcpy(inputarr, d_pinned_input_output_auxiliar_matrix, input_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
-		cudaMemcpy(outputarr, d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset, output_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
+		cudaMemcpy(inputarr, d_pinned_input_output_train_matrix, input_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
+		cudaMemcpy(outputarr, d_pinned_input_output_train_matrix + d_pinned_output_offset, output_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
 		imprimirMatrizPorPantalla("input", inputarr, num_examples, input_size);
 		imprimirMatrizPorPantalla("output", outputarr, num_examples, output_size);
 		*/
@@ -233,38 +260,66 @@ const void Network::copyInputOutputTrain(int num_examples, float* input_data, fl
 	}
 }
 
+const void Network::copyInputOutputValidation(int num_examples, float* input_data, float* output_data) {
+	if (num_examples <= max_validation_number_examples) {
+		cudaMemcpyAsync(h_pinned_input_validation_matrix, input_data, num_examples * input_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
+		cudaMemcpyAsync(h_pinned_output_validation_matrix, output_data, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_transferencia_output);
+		cudaMemcpyAsync(d_pinned_input_validation_matrix, h_pinned_input_validation_matrix, num_examples * input_size * sizeof(float), cudaMemcpyHostToDevice, stream_principal);
+		cudaMemcpyAsync(d_pinned_output_validation_matrix, h_pinned_output_validation_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToDevice, stream_transferencia_output);
+
+		//para hacer el backward, esperaré a que ambas transferencias hayan terminado
+		/*
+		//input y output se copian bien, deberían de llegar a tiempo sin necesidad de sincronización
+		cudaStreamSynchronize(stream_principal);
+		cudaStreamSynchronize(stream_transferencia_output);
+		float* inputarr = new float[input_size * num_examples];
+		float* outputarr = new float[output_size * num_examples];
+		cudaMemcpy(inputarr, d_pinned_input_validation_matrix, input_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
+		cudaMemcpy(outputarr, d_pinned_output_validation_matrix, output_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
+		imprimirMatrizPorPantalla("input val", inputarr, num_examples, input_size);
+		imprimirMatrizPorPantalla("output val", outputarr, num_examples, output_size);
+		*/
+	}
+	else {
+		printf("\nCannot copy input and output, more examples than max number of examples defined in initForward");
+	}
+}
+
 const void Network::forward(int num_examples, float* input_data, float* output_pointer_dest) {
-	if (num_examples <= max_input_number_examples) {
-		cudaMemcpyAsync(h_pinned_input_matrix, input_data, num_examples * input_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
-		cudaMemcpyAsync(d_pinned_input_output_auxiliar_matrix, h_pinned_input_matrix, num_examples * input_size * sizeof(float), cudaMemcpyHostToDevice, stream_principal);
-		layers[0]->forward(stream_principal, d_input_pointers, num_examples);
+	if (num_examples <= max_train_number_examples) {
+		cudaMemcpyAsync(h_pinned_input_train_matrix, input_data, num_examples * input_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
+		cudaMemcpyAsync(d_pinned_input_train_matrix, h_pinned_input_train_matrix, num_examples * input_size * sizeof(float), cudaMemcpyHostToDevice, stream_principal);
+		layers[0]->forward(stream_principal, d_input_train_pointers, num_examples);
 		for (int i = 1; i < number_layers; i++) {
-			layers[i]->forward(stream_principal, layers[i-1], num_examples);
+			layers[i]->forward(stream_principal, layers[i - 1], num_examples);
 		}
 
 		if (number_networks == 1) {
-			cudaMemcpyAsync(h_pinned_output_matrix, layers[number_layers-1]->getDeviceForward(), num_examples * output_size * sizeof(float), cudaMemcpyDeviceToHost, stream_principal);
-			cudaMemcpyAsync(output_pointer_dest, h_pinned_output_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
-		} else {
-			if (max_input_number_examples == 1) {
+			cudaMemcpyAsync(h_pinned_output_train_matrix, layers[number_layers - 1]->getDeviceForward(), num_examples * output_size * sizeof(float), cudaMemcpyDeviceToHost, stream_principal);
+			cudaMemcpyAsync(output_pointer_dest, h_pinned_output_train_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
+		}
+		else {
+			if (max_train_number_examples == 1) {
 				productoMatricesDevice(handle, d_auxiliar_expand_reduce_matrix, layers[number_layers - 1]->getDeviceForward(), d_output_forward_multiple_nn_sum, 1, number_networks, output_size);
-				
+
 				managedMultiplyAllElementsByConstant(stream_principal, max_num_threads, nextFourMultiple(output_size), d_output_forward_multiple_nn_sum, 1 / (float)number_networks);
 				//multiplyAllElementsByConstantVectorial << < (int)ceil(nextFourMultiple(num_examples * output_size) /(float)(max_num_threads*4)), min(max_num_threads, nextFourMultiple(num_examples * output_size) / 4), 0, stream_principal >> > (d_output_forward_multiple_nn_sum, 1 / (float)number_networks);
-				cudaMemcpyAsync(h_pinned_output_matrix, d_output_forward_multiple_nn_sum, num_examples * output_size * sizeof(float), cudaMemcpyDeviceToHost, stream_principal);
-				cudaMemcpyAsync(output_pointer_dest, h_pinned_output_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
-			} else {
+				cudaMemcpyAsync(h_pinned_output_train_matrix, d_output_forward_multiple_nn_sum, num_examples * output_size * sizeof(float), cudaMemcpyDeviceToHost, stream_principal);
+				cudaMemcpyAsync(output_pointer_dest, h_pinned_output_train_matrix, num_examples * output_size * sizeof(float), cudaMemcpyHostToHost, stream_principal);
+			}
+			else {
 				//habrá que hacer el sumatorio de todas las matrices al de todas las redes, y multiplicarles 1/numero_redes
 			}
 		}
 		cudaStreamSynchronize(stream_principal);
-	} else {
+	}
+	else {
 		printf("\nCannot make forward, more examples than max number of examples defined in initForward");
 	}
 }
 
 const void Network::forwardTrain(int num_examples) {
-	layers[0]->forward(stream_principal, d_input_pointers, num_examples);
+	layers[0]->forward(stream_principal, d_input_train_pointers, num_examples);
 	for (int i = 1; i < number_layers; i++) {
 		layers[i]->forward(stream_principal, layers[i - 1], num_examples);
 	}
@@ -273,8 +328,8 @@ const void Network::forwardTrain(int num_examples) {
 }
 
 //first batch_id = 0
-const void Network::forwardTrain(int num_examples, int batch_size, float** d_input_pointers) {
-	layers[0]->forward(stream_principal, d_input_pointers, batch_size);
+const void Network::forwardTrain(int num_examples, int batch_size, float** d_input_train_pointers) {
+	layers[0]->forward(stream_principal, d_input_train_pointers, batch_size);
 	for (int i = 1; i < number_layers; i++) {
 		layers[i]->forward(stream_principal, layers[i - 1], batch_size);
 	}
@@ -282,21 +337,23 @@ const void Network::forwardTrain(int num_examples, int batch_size, float** d_inp
 	cudaStreamSynchronize(stream_transferencia_output);
 }
 
-float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples) {
+float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, int offset_id) {
 	int* pos = new int[number_networks];
-	for (int i = 0; i < number_networks; i++) { pos[i] = 0; }
-	return trainGetCostFunctionAndCalculateLossFunction(num_examples, num_examples, pos);
+	for (int i = 0; i < number_networks; i++) { pos[i] = offset_id; }
+	float* res = trainGetCostFunctionAndCalculateLossFunction(num_examples, num_examples, pos);
+	delete pos;
+	return res;
 }
 
 //first batch_id = 0
 float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, int batch_size, int* batch_ids) {
-	if (batch_size <= max_input_number_examples) {
+	if (num_examples <= max_train_number_examples && batch_size <= max_batch_size) {
 		if (num_examples % batch_size == 0) {
 			int num_elems_batch = batch_size * input_size;
 			float** ptrs = new float* [number_networks];
-			for (int i = 0; i < number_networks; i++) { ptrs[i] = d_pinned_input_output_auxiliar_matrix + (batch_ids[i] * num_elems_batch); }
-			cudaMemcpy(d_input_pointers, ptrs, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
-			forwardTrain(num_examples, batch_size, d_input_pointers);
+			for (int i = 0; i < number_networks; i++) { ptrs[i] = d_pinned_input_train_matrix + (batch_ids[i] * num_elems_batch); }
+			cudaMemcpy(d_input_train_pointers, ptrs, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
+			forwardTrain(num_examples, batch_size, d_input_train_pointers);
 			delete ptrs;
 
 			num_elems_batch = batch_size * output_size;
@@ -305,7 +362,7 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 			for (int i = 0; i < number_networks; i++) {
 				managedApplyLossFunction(stream_principal, max_num_threads, num_elems_batch,
 					layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch),
-					d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset + (batch_ids[i] * num_elems_batch),
+					d_pinned_output_train_matrix + (batch_ids[i] * num_elems_batch),
 					d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch),
 					loss_function
 				);
@@ -342,7 +399,7 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 			for (int i = 0; i < number_networks; i++) {
 				managedApplyLossFunction(stream_principal, max_num_threads, num_elems_batch,
 					layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch),
-					d_pinned_input_output_auxiliar_matrix + d_pinned_output_offset + (batch_ids[i] * num_elems_batch),
+					d_pinned_output_train_matrix + (batch_ids[i] * num_elems_batch),
 					d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch),
 					derivative_loss_function
 				);
@@ -356,29 +413,41 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 			*/
 
 			return cost_function_result;
-		} else {
+		}
+		else {
 			printf("\nwhen batch forwardTrain, num_examples % batch_size must be 0");
 		}
-	} else {
-		printf("\nCannot make forward, more examples than max number of examples defined in initForward");
+	}
+	else {
+		printf("\nCannot make forward, more examples or bigger batch size than defined in initForwardTrain");
 	}
 	return NULL;
 }
 
+float* Network::backwardPhase(int num_examples, int offset_id) {
+	int* pos = new int[number_networks];
+	for (int i = 0; i < number_networks; i++) { pos[i] = offset_id; }
+	float* res = backwardPhase(num_examples, num_examples, pos);
+	delete pos;
+	return res;
+}
+
 float* Network::backwardPhase(int num_examples, int batch_size, int* batch_ids) {
-	if (batch_size <= max_input_number_examples) {
+	if (num_examples <= max_train_number_examples && batch_size <= max_batch_size) {
 		if (num_examples % batch_size == 0) {
 			float* cost_function = trainGetCostFunctionAndCalculateLossFunction(num_examples, batch_size, batch_ids);
 			for (int i = number_layers - 1; i > 0; i--) {
 				layers[i]->backward(stream_principal, layers[i - 1], batch_size);
 			}
-			layers[0]->backward(stream_principal, d_input_pointers, batch_size);
+			layers[0]->backward(stream_principal, d_input_train_pointers, batch_size);
 			return cost_function;
-		} else {
-			printf("\nwhen batch forwardTrain, num_examples % batch_size must be 0");
 		}
-	} else {
-		printf("\nCannot make forward, more examples than max number of examples defined in initForward");
+		else {
+			printf("\nwhen batch backwardPhase, num_examples % batch_size must be 0");
+		}
+	}
+	else {
+		printf("\nCannot make forward, more examples than max number of examples defined in initForwardTrain");
 	}
 	return NULL;
 }
@@ -389,15 +458,101 @@ void Network::applyVGradSGD(float lrate) {
 	}
 }
 
-void Network::finalizeForward() {
+float* Network::validationGetCostFunctionAndCalculateLossFunction(int num_examples, int offset_id) {
+	int* pos = new int[number_networks];
+	for (int i = 0; i < number_networks; i++) { pos[i] = offset_id; }
+	float* res = validationGetCostFunctionAndCalculateLossFunction(num_examples, num_examples, pos);
+	delete pos;
+	return res;
+}
+
+//first batch_id = 0
+float* Network::validationGetCostFunctionAndCalculateLossFunction(int num_examples, int batch_size, int* batch_ids) {
+	if (num_examples <= max_validation_number_examples && batch_size <= max_batch_size) {
+		if (num_examples % batch_size == 0) {
+			int num_elems_batch = batch_size * input_size;
+			float** ptrs = new float* [number_networks];
+			for (int i = 0; i < number_networks; i++) { ptrs[i] = d_pinned_input_validation_matrix + (batch_ids[i] * num_elems_batch); }
+			cudaMemcpy(d_input_validation_pointers, ptrs, number_networks * sizeof(float*), cudaMemcpyHostToDevice);
+			forwardTrain(num_examples, batch_size, d_input_validation_pointers);
+			delete ptrs;
+
+			num_elems_batch = batch_size * output_size;
+
+			//apply cost function
+			for (int i = 0; i < number_networks; i++) {
+				managedApplyLossFunction(stream_principal, max_num_threads, num_elems_batch,
+					layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch),
+					d_pinned_output_validation_matrix + (batch_ids[i] * num_elems_batch),
+					d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch),
+					loss_function
+				);
+			}
+
+			/*
+			float* matriz_Cost = new float[num_elems_batch * number_networks];
+			cudaMemcpy(matriz_Cost, d_auxiliar_matrix_loss_function_error_backprop, num_elems_batch * number_networks * sizeof(float), cudaMemcpyDeviceToHost);
+			imprimirMatrizPorPantalla("Error de coste val:", matriz_Cost, batch_size* number_networks, output_size);
+			delete matriz_Cost;
+			*/
+
+			//obtain cost function
+			float* cost_function_result = new float[number_networks];
+			float* d_res = 0;
+			cudaMalloc(&d_res, number_networks * sizeof(float));
+			productoMatricesBatchDevice(handle, layers[number_layers - 1]->getAuxiliarExpandReduceMatrixPointers(), layers[number_layers - 1]->getDeviceAuxiliarErrorForwardLayerPointers(), d_output_forward_multiple_nn_sum_pointers, 1, batch_size, output_size, number_networks);
+
+			/*
+			float* matriz_Cost = new float[number_networks * output_size];
+			cudaMemcpy(matriz_Cost, d_output_forward_multiple_nn_sum, number_networks * output_size * sizeof(float), cudaMemcpyDeviceToHost);
+			imprimirMatrizPorPantalla("Error de coste val agrupando batch sin mul:", matriz_Cost, number_networks, output_size);
+			delete matriz_Cost;
+			*/
+
+			managedMultiplyAllElementsByConstant(stream_principal, max_num_threads, output_size * number_networks, d_output_forward_multiple_nn_sum, 1 / (float)(batch_size));
+				
+			/*
+			float* matriz_Cost = new float[number_networks * output_size];
+			cudaMemcpy(matriz_Cost, d_output_forward_multiple_nn_sum, number_networks * output_size * sizeof(float), cudaMemcpyDeviceToHost);
+			imprimirMatrizPorPantalla("Error de coste val agrupando batch con mul:", matriz_Cost, number_networks, output_size);
+			delete matriz_Cost;
+			*/
+
+			productoMatricesDevice(handle, d_auxiliar_expand_reduce_matrix, d_output_forward_multiple_nn_sum, d_res, 1, output_size, number_networks);
+			cudaMemcpy(cost_function_result, d_res, number_networks * sizeof(float), cudaMemcpyDeviceToHost);
+			for (int i = 0; i < number_networks; i++) { cost_function_result[i] = cost_function_result[i] / (float)output_size; }
+			cudaFree(d_res);
+
+			return cost_function_result;
+		}
+		else {
+			printf("\nwhen batch forwardTrain, num_examples % batch_size must be 0");
+		}
+	}
+	else {
+		printf("\nCannot make forward, more examples or bigger batch size than defined in initForwardTrain");
+	}
+	return NULL;
+}
+
+void Network::finalizeForwardBackward() {
 	cublasSetStream_v2(handle, 0);
 	cudaStreamDestroy(stream_principal);
 	cudaStreamDestroy(stream_transferencia_output);
-	cudaFree(d_pinned_input_output_auxiliar_matrix);
-	cudaFree(d_input_pointers);
-	cudaFreeHost(h_pinned_input_matrix);
-	cudaFreeHost(h_pinned_output_matrix);
-	
+
+	if (d_pinned_input_train_matrix != NULL) { cudaFree(d_pinned_input_train_matrix); d_pinned_input_train_matrix = NULL; }
+	if (d_pinned_output_train_matrix != NULL) { cudaFree(d_pinned_output_train_matrix); d_pinned_output_train_matrix = NULL; }
+	if (h_pinned_input_train_matrix != NULL) { cudaFreeHost(h_pinned_input_train_matrix); h_pinned_input_train_matrix = NULL; }
+	if (h_pinned_input_train_matrix != NULL) { cudaFreeHost(h_pinned_input_train_matrix); h_pinned_input_train_matrix = NULL; }
+
+	if (d_pinned_input_validation_matrix != NULL) { cudaFree(d_pinned_input_validation_matrix); d_pinned_input_validation_matrix = NULL; }
+	if (d_pinned_output_validation_matrix != NULL) { cudaFree(d_pinned_output_validation_matrix); d_pinned_output_validation_matrix = NULL; }
+	if (h_pinned_input_validation_matrix != NULL) { cudaFreeHost(h_pinned_input_validation_matrix); h_pinned_input_validation_matrix = NULL; }
+	if (h_pinned_input_validation_matrix != NULL) { cudaFreeHost(h_pinned_input_validation_matrix); h_pinned_input_validation_matrix = NULL; }
+
+	if (d_input_train_pointers != NULL) { cudaFree(d_input_train_pointers); d_input_train_pointers = NULL; }
+	if (d_input_validation_pointers != NULL) { cudaFree(d_input_validation_pointers); d_input_validation_pointers = NULL; }
+
 	for (int i = 0; i < number_layers; i++) {
 		layers[i]->setNumberInputExamples(0);
 		layers[i]->setAuxiliarExpandReduceMatrix(NULL);
@@ -414,6 +569,9 @@ void Network::finalizeForward() {
 	if (d_auxiliar2_matrix_loss_function_error_backprop != NULL) { cudaFree(d_auxiliar2_matrix_loss_function_error_backprop); d_auxiliar2_matrix_loss_function_error_backprop = NULL; }
 
 	cudaDeviceSynchronize();
+
 	max_batch_size = 0;
-	max_input_number_examples = 0;
+	max_train_number_examples = 0;
+	max_validation_number_examples = 0;
+	max_layer_size = 0;
 }
