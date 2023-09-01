@@ -54,6 +54,38 @@ int main() {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    int m = 16;
+
+    ///*
+    Network* n = new Network(m, 1, 3, new Layer * [3] {
+        new Layer(m, ELU, dELU),
+        new Layer(m, ELU, dELU),
+        new Layer(m, Linear, dLinear),
+    }, MSE, dMSE);
+
+    n->initWeightBiasValues();
+
+    n->showWeightsBiasesLayers();
+
+    float* input = new float[m];
+    float* output = new float[m];
+
+    n->initForwardTrain(1, 1, 1);
+
+    n->copyInputOutputTrain(1, input, output);
+    n->copyInputOutputValidation(1, input, output);
+
+    //n->trainAllExamplesMaxBatchSGD(20000, 500, 0.00000001, 0.0000001, 6, 0.01);
+
+    //n->trainGetCostFunctionAndCalculateLossFunction(1, 0);
+    //n->showForwardMatrices();
+
+    n->finalizeForwardBackward();
+
+    delete n;
+    //*/
+
+    /*
     Network* n = new Network(2, 5, 3, new Layer * [3] {
         new Layer(10, ELU, dELU),
             new Layer(10, ELU, dELU),
@@ -66,44 +98,22 @@ int main() {
     float* output = new float[4 * 1] { 1, 0, 0, 1 };
 
     float* input_val = new float[4 * 2] { 0, 0, 0, 1, 1, 0, 1, 1 };
-    float* output_val = new float[4 * 1] { 0, 1, 1, 0 };
+    float* output_val = new float[4 * 1] { 1, 0, 0, 1 };
 
     n->initForwardTrain(4, 4, 4);
 
     n->copyInputOutputTrain(4, input, output);
     n->copyInputOutputValidation(4, input_val, output_val);
 
-    float* errs;
-    float* errs_val;
+    n->trainAllExamplesMaxBatchSGD(20000, 500, 0.00000001, 0.0000001, 6, 0.01);
 
-    int* indx = new int[5] {0, 0, 0, 0, 0};
-
-    //n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
-    //n->showForwardMatrices();
-
-    int niter = 20000;
-    int mostrar_cada = 500;
-    for (int i = 0; i < niter; i++) {
-        errs = n->backwardPhase(4, 4, indx);
-        n->applyVGradSGD(0.01);
-        errs_val = n->validationGetCostFunctionAndCalculateLossFunction(4, 4, indx);
-        if (i == 0 || (i + 1) % mostrar_cada == 0) { 
-            printf("\nITERACION %d:", i + 1);
-            for (int j = 0; j < 5; j++) {
-                printf("\n\tRED %j-> err train: %.20f  err test: %.20f", errs[j], errs_val[j]);
-            }
-            printf("\n");
-        }
-        delete errs;
-        delete errs_val;
-    }
-
-    n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
+    n->trainGetCostFunctionAndCalculateLossFunction(4, 0);
     n->showForwardMatrices();
 
     n->finalizeForwardBackward();
 
     delete n;
+    */
 
     /*
     int* nums = new int[20];
