@@ -54,9 +54,38 @@ int main() {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    Network* n = new Network(256, 1, 3, new Layer * [3] {
+        new Layer(256, ELU, dELU),
+        new Layer(256, ELU, dELU),
+        new Layer(256, Linear, dLinear),
+    }, MSE, dMSE);
+
+    n->initWeightBiasValues();
+
+    //n->showWeightsBiasesLayers();
+
+    float* input = new float[256*144];
+    float* output = new float[256 * 144];
+
+    for (int i = 0; i < 256 * 144; i++) { input[i] = 10; output[i] = 0; }
+
+    n->initForwardTrain(144, 144, 32);
+
+    n->copyInputOutputTrain(144, input, output);
+    n->copyInputOutputValidation(144, input, output);
+
+    n->trainAllExamplesMaxBatchSGD(20000, 500, 0.00000001, 0.0000001, 6, 0.01);
+
+    n->trainGetCostFunctionAndCalculateLossFunction(32, 0);
+    n->showForwardMatrices();
+
+    n->finalizeForwardBackward();
+
+    delete n;
+
+    /*
     int m = 16;
 
-    ///*
     Network* n = new Network(m, 1, 3, new Layer * [3] {
         new Layer(m, ELU, dELU),
         new Layer(m, ELU, dELU),
@@ -65,25 +94,34 @@ int main() {
 
     n->initWeightBiasValues();
 
-    n->showWeightsBiasesLayers();
+    //n->showWeightsBiasesLayers();
+
+    int* nums = new int[m];
+    for (int i = 0; i < m; i++) { nums[i] = i; }
+    edu_shuffle(nums, m);
+
+    printf("\nOriginal: ");
+    for (int i = 0; i < m; i++) { printf(" %d,", nums[i]); }
+    printf("\n");
 
     float* input = new float[m];
     float* output = new float[m];
+    for (int i = 0; i < m; i++) { input[i] = (float) nums[i]; output[i] = (float) nums[i]; }
 
     n->initForwardTrain(1, 1, 1);
 
     n->copyInputOutputTrain(1, input, output);
     n->copyInputOutputValidation(1, input, output);
 
-    //n->trainAllExamplesMaxBatchSGD(20000, 500, 0.00000001, 0.0000001, 6, 0.01);
+    n->trainAllExamplesMaxBatchSGD(20000, 500, 0.00000001, 0.0000001, 6, 0.01);
 
-    //n->trainGetCostFunctionAndCalculateLossFunction(1, 0);
-    //n->showForwardMatrices();
+    n->trainGetCostFunctionAndCalculateLossFunction(1, 0);
+    n->showForwardMatrices();
 
     n->finalizeForwardBackward();
 
     delete n;
-    //*/
+    */
 
     /*
     Network* n = new Network(2, 5, 3, new Layer * [3] {

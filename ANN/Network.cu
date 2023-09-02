@@ -249,8 +249,8 @@ const void Network::copyInputOutputTrain(int num_examples, float* input_data, fl
 		//input y output se copian bien, deberían de llegar a tiempo sin necesidad de sincronización
 		float* inputarr = new float[input_size * num_examples];
 		float* outputarr = new float[output_size * num_examples];
-		cudaMemcpy(inputarr, d_pinned_input_output_train_matrix, input_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
-		cudaMemcpy(outputarr, d_pinned_input_output_train_matrix + d_pinned_output_offset, output_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
+		cudaMemcpy(inputarr, d_pinned_input_train_matrix, input_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
+		cudaMemcpy(outputarr, d_pinned_output_train_matrix, output_size * num_examples * sizeof(float), cudaMemcpyDeviceToHost);
 		imprimirMatrizPorPantalla("input", inputarr, num_examples, input_size);
 		imprimirMatrizPorPantalla("output", outputarr, num_examples, output_size);
 		*/
@@ -550,18 +550,27 @@ void Network::epochAllExamplesSGD(float lrate, int number_train_batches, int num
 	edu_shuffle(train_indices, number_train_batches);
 	for (int i = 0; i < repeat_train_arr - 1; i++) { memcpy(train_indices + i*number_train_batches, train_indices, number_train_batches*sizeof(int)); }
 
+	/*printf("\nIndices entrenamiento: ");
+	for (int i = 0; i < number_train_batches * repeat_train_arr; i++) { printf("%d, ", train_indices[i]); }
+	printf("\n");*/
+
 	memset(val_indices, 0, number_validation_batches * repeat_validation_arr * sizeof(float));
 	for (int i = 0; i < number_validation_batches; i++) { val_indices[i] = i; }
 	edu_shuffle(val_indices, number_validation_batches);
 	for (int i = 0; i < repeat_validation_arr - 1; i++) { memcpy(val_indices + i * number_validation_batches, val_indices, number_validation_batches * sizeof(int)); }
 
+	/*printf("\nIndices validacion: ");
+	for (int i = 0; i < number_validation_batches * repeat_validation_arr; i++) { printf("%d, ", val_indices[i]); }
+	printf("\n");*/
+
 	for (int i = 0; i < max(1, number_train_batches - number_networks); i++) {
-		float* tmp_res_cost_train = backwardPhase(max_train_number_examples, max_batch_size, train_indices + i, early_counters);
+		float* tmp_res_cost_train = backwardPhase(number_train_batches* max_batch_size, max_batch_size, train_indices + i, early_counters);
 		applyVGradSGD(lrate);
 		for (int j = 0; j < number_networks; j++) { cost_train[j] += tmp_res_cost_train[j] * max_batch_size / (float)max_train_number_examples; }
 		delete tmp_res_cost_train;
 	}
 	if (number_remainder_train_examples > 0) {
+		//printf("\nResto de entrenamiento en: %d\n", max_train_number_examples - number_remainder_train_examples);
 		float* tmp_res_cost_train = backwardPhase(number_remainder_train_examples, max_train_number_examples - number_remainder_train_examples, early_counters);
 		applyVGradSGD(lrate);
 		for (int j = 0; j < number_networks; j++) { cost_train[j] += tmp_res_cost_train[j] * number_remainder_train_examples / (float)max_train_number_examples; }
@@ -569,11 +578,12 @@ void Network::epochAllExamplesSGD(float lrate, int number_train_batches, int num
 	}
 
 	for (int i = 0; i < max(1, number_validation_batches - number_networks); i++) {
-		float* tmp_res_cost_val = validationGetCostFunctionAndCalculateLossFunction(max_validation_number_examples, max_batch_size, val_indices + i);
+		float* tmp_res_cost_val = validationGetCostFunctionAndCalculateLossFunction(number_validation_batches * max_batch_size, max_batch_size, val_indices + i);
 		for (int j = 0; j < number_networks; j++) { cost_val[j] += tmp_res_cost_val[j] * max_batch_size / (float)max_validation_number_examples; }
 		delete tmp_res_cost_val;
 	}
 	if (number_remainder_validation_examples > 0) {
+		//printf("\nResto de validacion en: %d\n", max_validation_number_examples - number_remainder_validation_examples);
 		float* tmp_res_cost_val = validationGetCostFunctionAndCalculateLossFunction(number_remainder_validation_examples, max_validation_number_examples - number_remainder_validation_examples);
 		for (int j = 0; j < number_networks; j++) { cost_val[j] += tmp_res_cost_val[j] * number_remainder_validation_examples / (float)max_validation_number_examples; }
 		delete tmp_res_cost_val;
