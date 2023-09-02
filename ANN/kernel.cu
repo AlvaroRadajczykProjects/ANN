@@ -54,6 +54,7 @@ int main() {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /*
     Network* n = new Network(256, 1, 3, new Layer * [3] {
         new Layer(256, ELU, dELU),
         new Layer(256, ELU, dELU),
@@ -81,7 +82,37 @@ int main() {
 
     n->finalizeForwardBackward();
 
+    n->storeNetworkInFile("network.data");
+
     delete n;
+    */
+
+    /*
+    Network* n = new Network(256, 1, 3, new Layer * [3] {
+        new Layer(256, ELU, dELU),
+            new Layer(256, ELU, dELU),
+            new Layer(256, Linear, dLinear),
+        }, MSE, dMSE);
+
+    n->loadNetworkFromFile("network.data");
+
+    float* input = new float[256 * 144];
+    float* output = new float[256 * 144];
+
+    for (int i = 0; i < 256 * 144; i++) { input[i] = 10; output[i] = 0; }
+
+    n->initForwardTrain(144, 144, 32);
+
+    n->copyInputOutputTrain(144, input, output);
+    n->copyInputOutputValidation(144, input, output);
+
+    n->trainGetCostFunctionAndCalculateLossFunction(32, 0);
+    n->showForwardMatrices();
+
+    n->finalizeForwardBackward();
+
+    delete n;
+    */
 
     /*
     int m = 16;

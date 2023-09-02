@@ -78,6 +78,8 @@ class Layer {
         float** getAuxiliarExpandReduceMatrixPointers();
         float** getDeviceAuxiliarErrorForwardLayerPointers();
         float** getDeviceAuxiliar2ErrorForwardLayerPointers();
+        int getTotalElementsBiasVectors();
+        int getTotalElementsWeightMatrices();
 
         void setMaxNumThreads(int set);
         void setInputSize(int is);
@@ -108,7 +110,7 @@ class Layer {
         void freeBackwardMemory();
 
         void copyWeightBias( float* h_weight, float* h_bias );
-
+        void storeBiasVectorsWeightMatrices( float* h_weight, float* h_bias );
 
         /*int getInputSize();
         

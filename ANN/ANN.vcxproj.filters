@@ -31,6 +31,7 @@
     <ClInclude Include="Network.cuh">
       <Filter>Classes\Network</Filter>
     </ClInclude>
+    <ClInclude Include="funciones_archivos.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ActivationLossFunctions">
@@ -56,5 +57,6 @@
     <ClCompile Include="PrintUtils.cpp">
       <Filter>PrintUtils</Filter>
     </ClCompile>
+    <ClCompile Include="funciones_archivos.cpp" />
   </ItemGroup>
 </Project>

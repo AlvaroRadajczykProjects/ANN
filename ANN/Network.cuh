@@ -103,6 +103,9 @@ class Network {
 
         void finalizeForwardBackward();
 
+        void storeNetworkInFile(char* name);
+        void loadNetworkFromFile(char* name);
+
         //void initBackwardADAM();
         //void finalizeBackwardADAM();
 

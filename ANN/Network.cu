@@ -1,4 +1,5 @@
 #include "Network.cuh"
+#include "funciones_archivos.h"
 
 using namespace std;
 
@@ -698,4 +699,46 @@ void Network::finalizeForwardBackward() {
 	max_train_number_examples = 0;
 	max_validation_number_examples = 0;
 	max_layer_size = 0;
+}
+
+void Network::storeNetworkInFile(char* name) {
+	
+	unsigned long long num_elems = 0;
+	for (int i = 0; i < number_layers; i++) { num_elems += layers[i]->getTotalElementsBiasVectors() + layers[i]->getTotalElementsWeightMatrices(); }
+
+	unsigned long long offset = 0;
+	float* data = new float[num_elems];
+
+	for (int i = 0; i < number_layers; i++) {
+		layers[i]->storeBiasVectorsWeightMatrices(data + layers[i]->getTotalElementsBiasVectors() + offset, data + offset);
+		offset += layers[i]->getTotalElementsBiasVectors() + layers[i]->getTotalElementsWeightMatrices();
+	}
+
+	char* buffer = (char*) data;
+	crearArchivoEscribirYCerrar(name, num_elems * sizeof(float), buffer);
+
+	delete data;
+}
+
+void Network::loadNetworkFromFile(char* name) {
+	
+	unsigned int nbytes = 0;
+
+	char* cargar = leerArchivoYCerrar(name, &nbytes);
+
+	unsigned int nnumeros = nbytes / 4;
+
+	float* data = (float*)cargar;
+
+	unsigned long long num_elems = 0;
+	for (int i = 0; i < number_layers; i++) { num_elems += layers[i]->getTotalElementsBiasVectors() + layers[i]->getTotalElementsWeightMatrices(); }
+
+	if (num_elems != nnumeros) { printf("\nError loading Network: not same number of elements (total numbers of biases and weights)\n"); }
+
+	unsigned long long offset = 0;
+	for (int i = 0; i < number_layers; i++) {
+		layers[i]->copyWeightBias(data + layers[i]->getTotalElementsBiasVectors() + offset, data + offset);
+		offset += layers[i]->getTotalElementsBiasVectors() + layers[i]->getTotalElementsWeightMatrices();
+	}
+
 }

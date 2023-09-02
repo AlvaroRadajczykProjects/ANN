@@ -98,6 +98,14 @@ float** Layer::getDeviceAuxiliar2ErrorForwardLayerPointers() {
     return d_auxiliar2_error_forward_layer_pointers;
 }
 
+int Layer::getTotalElementsBiasVectors() {
+    return size * number_networks;
+}
+
+int Layer::getTotalElementsWeightMatrices() {
+    return input_size * size * number_networks;
+}
+
 void Layer::setMaxNumThreads(int set) {
     max_num_threads = set;
 }
@@ -377,5 +385,13 @@ void Layer::copyWeightBias(float* h_weight, float* h_bias) {
     if (input_size > 0 && size > 0 && number_networks > 0) {
         cudaMemcpy(d_array_weight_matrix, h_weight, input_size * size * number_networks * sizeof(float), cudaMemcpyHostToDevice);
         cudaMemcpy(d_array_bias_vector, h_bias, size * number_networks * sizeof(float), cudaMemcpyHostToDevice);
+    }
+}
+
+void Layer::storeBiasVectorsWeightMatrices(float* h_weight, float* h_bias) {
+    if (input_size > 0 && size > 0 && number_networks > 0) {
+        //printf("\nPunteros: %p %p\n", d_array_weight_matrix, d_array_bias_vector);
+        cudaMemcpy(h_weight, d_array_weight_matrix, input_size * size * number_networks * sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(h_bias, d_array_bias_vector, size * number_networks * sizeof(float), cudaMemcpyDeviceToHost);
     }
 }
