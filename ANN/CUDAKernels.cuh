@@ -36,6 +36,8 @@ void manageCUDAError(cudaError_t status, char* description);
 
 unsigned long long nextMultiple(unsigned long long val, int mod);
 
+unsigned long long nextFourMultiple(unsigned long long val);
+
 const void matrizTraspuestaDevice(cublasHandle_t handle, float* odata, float* idata, int m, int n);
 
 const void productoMatricesDevice(cublasHandle_t handle, const float* a, const float* b, float* c, int m, int k, int n);

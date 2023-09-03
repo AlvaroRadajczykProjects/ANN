@@ -11,6 +11,12 @@
     <CudaCompile Include="HostPinnedDeviceMatrix.cu">
       <Filter>Classes\HostPinnedDeviceMatrix</Filter>
     </CudaCompile>
+    <CudaCompile Include="Layer.cu">
+      <Filter>Classes\Layer</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Network.cu">
+      <Filter>Classes\Network</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ActivationLossFunctions.cuh">
@@ -25,6 +31,12 @@
     <ClInclude Include="funciones_archivos.h" />
     <ClInclude Include="HostPinnedDeviceMatrix.cuh">
       <Filter>Classes\HostPinnedDeviceMatrix</Filter>
+    </ClInclude>
+    <ClInclude Include="Layer.cuh">
+      <Filter>Classes\Layer</Filter>
+    </ClInclude>
+    <ClInclude Include="Network.cuh">
+      <Filter>Classes\Network</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

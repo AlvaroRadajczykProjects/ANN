@@ -9,7 +9,7 @@ void edu_shuffle(int arr[], int n) {
 
 void manageCUDAError(cudaError_t status, char* description) {
     if (status != cudaSuccess) {
-        fprintf(stderr, "Error de CUDA %s: %s\n", description, cudaGetErrorString(status));
+        fprintf(stderr, "\n\nError de CUDA %s: %s\n\n", description, cudaGetErrorString(status));
         exit(EXIT_FAILURE);
     }
 }
@@ -18,6 +18,12 @@ unsigned long long nextMultiple(unsigned long long val, int mod) {
     if (val == 0) { return mod; }
     if (val % mod == 0) { return val; }
     return val + (mod - (val % mod));
+}
+
+unsigned long long nextFourMultiple(unsigned long long val) {
+    if (val == 0) { return 4; }
+    if (val % 4 == 0) { return val; }
+    return val + (4 - (val % 4));
 }
 
 const void matrizTraspuestaDevice(cublasHandle_t handle, float* odata, float* idata, int m, int n) {

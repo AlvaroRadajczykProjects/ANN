@@ -31,7 +31,18 @@ class HostPinnedDeviceMatrix {
 		float* getDevicePointer();
 
 		void copyHostToDevice(float* h_ptr, cudaStream_t stream);
+		void copyHostToDevice(float* h_ptr, int nrows, cudaStream_t stream);
+
 		void copyDeviceToHost(float* h_ptr, cudaStream_t stream);
+		void copyDeviceToHost(float* h_ptr, int nrows, cudaStream_t stream);
+
+		void copyFromDevice(float* d_ptr, cudaStream_t stream);
+		void copyFromDevice(float* d_ptr, int nrows, cudaStream_t stream);
+
+		void copyToDevice(float* d_ptr, cudaStream_t stream);
+		void copyToDevice(float* d_ptr, int nrows, cudaStream_t stream);
+
+		float** generateDeviceRowsPointers( int row_offset, int num_rows, int* row_ids );
 
 		void showDeviceMatrix(char* msg, cudaStream_t stream);
 

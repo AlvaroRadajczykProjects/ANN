@@ -2,9 +2,11 @@
 #include <chrono>
 
 #include "ActivationLossFunctions.cuh"
-#include "HostPinnedDeviceMatrix.cuh"
+#include "Network.cuh"
 
 #define N 20
+
+using namespace std;
 
 extern __device__ func_t d_ELU;
 extern __device__ func_t d_dELU;
@@ -55,42 +57,47 @@ int main() {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    HostPinnedDeviceMatrix* p = new HostPinnedDeviceMatrix(3, 9, 4);
+    int nrand = (rand() % 300) + 100;
+    int nrand2 = (rand() % 300) + 100;
 
-    float* misdatos = new float[3 * 9];
-    float* misdatos_cop = new float[3 * 9];
+    int temp = max(nrand, nrand2);
+    int temp2 = min(nrand, nrand2);
 
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 9; j++) {
-            misdatos[i * 9 + j] = j+1;
-        }
-    }
+    nrand = temp;
+    nrand2 = temp2;
 
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
+    printf("Random number: %d\n", nrand);
+    printf("Random number 2: %d\n", nrand2);
 
-    /*
-    imprimirMatrizPorPantalla("a", misdatos, 3, 9);
-    imprimirMatrizPorPantalla("b", misdatos_cop, 3, 9);
+    Network* n = new Network(256, 1, 1, new Layer * [3] {
+        new Layer(256, ELU, dELU),
+        new Layer(256, ELU, dELU),
+        new Layer(256, Linear, dLinear),
+    }, MSE, dMSE);
 
-    p->showDeviceMatrix("c", stream);
-    p->copyHostToDevice(misdatos, stream);
-    cudaStreamSynchronize(stream);
-    p->showDeviceMatrix("d", stream);
+    n->initWeightBiasValues();
 
-    imprimirMatrizPorPantalla("e", misdatos, 3, 9);
-    imprimirMatrizPorPantalla("f", misdatos_cop, 3, 9);
+    float* input = new float[256 * nrand];
+    float* output = new float[256 * nrand];
 
-    p->showDeviceMatrix("g", stream);
-    p->copyDeviceToHost(misdatos_cop, stream);
-    cudaStreamSynchronize(stream);
-    p->showDeviceMatrix("h", stream);
+    float* input2 = new float[256 * nrand2];
+    float* output2 = new float[256 * nrand2];
 
-    imprimirMatrizPorPantalla("i", misdatos, 3, 9);
-    imprimirMatrizPorPantalla("j", misdatos_cop, 3, 9);
-    */
+    for (int i = 0; i < 256 * nrand; i++) { input[i] = 10; output[i] = 1; }
+    for (int i = 0; i < 256 * nrand2; i++) { input2[i] = 10; output2[i] = 1; }
 
-    delete p;
+    n->initForwardTrain(nrand, nrand2, 32);
+
+    n->copyInputOutputTrain(nrand, input, output);
+    n->copyInputOutputValidation(nrand2, input2, output2);
+
+    n->trainAllExamplesMaxBatchSGD(5000, 500, 0.1, 0.0001, 6, 0.00001);
+
+    //n->showForwardMatrices();
+
+    n->finalizeForwardBackward();
+
+    delete n;
 
     /*
     Network* n = new Network(256, 1, 3, new Layer * [3] {
@@ -119,89 +126,38 @@ int main() {
     delete n;
     */
 
-    /*
-    int m = 16;
+    //PRUEBA FUNCIONAMIENTO FORWARD
 
-    Network* n = new Network(m, 1, 3, new Layer * [3] {
-        new Layer(m, ELU, dELU),
-        new Layer(m, ELU, dELU),
-        new Layer(m, Linear, dLinear),
+    /*
+    Layer* l1 = new Layer(2, ELU, dELU);
+    Layer* l2 = new Layer(1, Linear, dLinear);
+
+    Network* n = new Network(2, 2, 2, new Layer* [2]{
+        l1,
+        l2
     }, MSE, dMSE);
 
-    n->initWeightBiasValues();
+    l1->copyWeightBias(new float[8] {-0.6057236802202783, -1.3743868186905905, 0.6057236802202786, 1.3743868186905905, -0.6057236802202783, -1.3743868186905905, 0.6057236802202786, 1.3743868186905905}, new float[4] {0.6057236802202781, -2.2751145817937323e-17, 0.6057236802202781, -2.2751145817937323e-17});
+    l2->copyWeightBias(new float[4] {-1.6689619673839928, 1.463146879527966, -1.6689619673839928, 1.463146879527966}, new float[2] {1.0109297850315095, 1.0109297850315095});
 
-    //n->showWeightsBiasesLayers();
+    n->showInfoAboutNetwork();
+    n->showWeightsBiasesLayers();
 
-    int* nums = new int[m];
-    for (int i = 0; i < m; i++) { nums[i] = i; }
-    edu_shuffle(nums, m);
+    float* res = new float[4];
 
-    printf("\nOriginal: ");
-    for (int i = 0; i < m; i++) { printf(" %d,", nums[i]); }
-    printf("\n");
+    n->initForward(1);
 
-    float* input = new float[m];
-    float* output = new float[m];
-    for (int i = 0; i < m; i++) { input[i] = (float) nums[i]; output[i] = (float) nums[i]; }
+    n->showAuxiliarExpandReduceMatrices();
 
-    n->initForwardTrain(1, 1, 1);
+    n->forward(1, new float[2 * 1] { 1, 1 }, res);
 
-    n->copyInputOutputTrain(1, input, output);
-    n->copyInputOutputValidation(1, input, output);
-
-    n->trainAllExamplesMaxBatchSGD(20000, 500, 0.00000001, 0.0000001, 6, 0.01);
-
-    n->trainGetCostFunctionAndCalculateLossFunction(1, 0);
     n->showForwardMatrices();
+
+    imprimirMatrizPorPantalla("Resultado forward host: ", res, 1, 1);
 
     n->finalizeForwardBackward();
 
     delete n;
-    */
-
-    /*
-    Network* n = new Network(2, 5, 3, new Layer * [3] {
-        new Layer(10, ELU, dELU),
-            new Layer(10, ELU, dELU),
-            new Layer(1, Linear, dLinear),
-    }, MSE, dMSE);
-
-    n->initWeightBiasValues();
-
-    float* input = new float[4 * 2] { 0, 0, 0, 1, 1, 0, 1, 1 };
-    float* output = new float[4 * 1] { 1, 0, 0, 1 };
-
-    float* input_val = new float[4 * 2] { 0, 0, 0, 1, 1, 0, 1, 1 };
-    float* output_val = new float[4 * 1] { 1, 0, 0, 1 };
-
-    n->initForwardTrain(4, 4, 4);
-
-    n->copyInputOutputTrain(4, input, output);
-    n->copyInputOutputValidation(4, input_val, output_val);
-
-    n->trainAllExamplesMaxBatchSGD(20000, 500, 0.00000001, 0.0000001, 6, 0.01);
-
-    n->trainGetCostFunctionAndCalculateLossFunction(4, 0);
-    n->showForwardMatrices();
-
-    n->finalizeForwardBackward();
-
-    delete n;
-    */
-
-    /*
-    int* nums = new int[20];
-    for (int i = 0; i < 20; i++) { nums[i] = i; }
-    
-    printf("\n");
-    for (int i = 0; i < 20; i++) { printf(" %d,", nums[i]); }
-    printf("\n");
-
-    edu_shuffle(nums, 20);
-
-    printf("\n");
-    for (int i = 0; i < 20; i++) { printf(" %d,", nums[i]); }
-    printf("\n");
     */
 
     //FORWARD UNA RED VARIOS EJEMPLOS A LA VEZ
@@ -229,6 +185,42 @@ int main() {
     n->forward(4, input, res);
 
     n->showForwardMatrices();
+
+    imprimirMatrizPorPantalla("Resultado forward host: ", res, 4, 1);
+
+    n->finalizeForwardBackward();
+
+    delete n;
+    */
+
+    //PRUEBA VELOCIDAD FORWARD
+
+    /*
+    Network* n = new Network(256, 2, 3, new Layer * [3] {
+        new Layer(256, ELU, dELU),
+        new Layer(256, ELU, dELU),
+        new Layer(256, Linear, dLinear)
+    }, MSE, dMSE);
+
+    float* inp = new float[256];
+    float* res = new float[256];
+
+    n->initForward(1);
+
+    std::chrono::time_point<std::chrono::system_clock> startCPU, endCPU;
+
+    for (int i = 0; i < 100; i++) {
+        startCPU = std::chrono::system_clock::now();
+
+        n->forward(1, inp, res);
+
+        endCPU = std::chrono::system_clock::now();
+
+        std::chrono::duration<double> elapsed_seconds = endCPU - startCPU;
+        std::time_t end_time = std::chrono::system_clock::to_time_t(endCPU);
+
+        std::cout << "elapsed time: " << elapsed_seconds.count() << "s; " << elapsed_seconds.count() * 1000 << "ms\n";
+    }
 
     n->finalizeForwardBackward();
 
@@ -265,7 +257,8 @@ int main() {
         //n->trainGetCostFunctionAndCalculateLossFunction(4, 4, new int[1] {0});
         //n->showForwardMatrices();
         //n->showErrorWeightsBiasesLayers();
-        err = n->backwardPhase(4, 4, new int[1] {0})[0];
+        //err = n->backwardPhase(4, 0, NULL)[0];
+        err = n->backwardPhase(4, 0, NULL)[0];
         if(i == 0 || (i+1)%500 == 0){ printf("\nError %d: %.20f", i+1, err); }
         n->applyVGradSGD(0.01);
     }
@@ -297,21 +290,17 @@ int main() {
 
     n->copyInputOutputTrain(4, input, output);
     float* errs;
-    int* indx = new int[5] {0, 0, 0, 0, 0};
-
-    n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
-    n->showForwardMatrices();
 
     int niter = 20000;
     int mostrar_cada = 500;
     for (int i = 0; i < niter; i++) {
-        errs = n->backwardPhase(4, 4, indx);
+        errs = n->backwardPhase(4, 0, NULL);
         if (i == 0 || (i + 1) % mostrar_cada == 0) { printf("\nErrores %d: %.20f %.20f %.20f %.20f %.20f", i + 1, errs[0], errs[1], errs[2], errs[3], errs[4]); }
         n->applyVGradSGD(0.01);
         delete errs;
     }
 
-    n->trainGetCostFunctionAndCalculateLossFunction(4, 4, indx);
+    n->trainGetCostFunctionAndCalculateLossFunction(4, 0);
     n->showForwardMatrices();
 
     n->finalizeForwardBackward();
@@ -319,72 +308,73 @@ int main() {
     delete n;
     */
 
-    //PRUEBA FUNCIONAMIENTO FORWARD
-
     /*
-    Layer* l1 = new Layer(2, ELU, dELU);
-    Layer* l2 = new Layer(1, Linear, dLinear);
+    HostPinnedDeviceMatrix* p = new HostPinnedDeviceMatrix(3, 9, 4, cudaHostAllocWriteCombined);
 
-    Network* n = new Network(2, 2, 2, new Layer* [2]{
-        l1,
-        l2
-    }, MSE, dMSE);
+    float* misdatos = new float[3 * 9];
+    float* misdatos_cop = new float[3 * 9];
 
-    l1->copyWeightBias(new float[8] {1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509, 1.1172228789729295, 0.8939801347687951, 1.1172228787243454, 0.8939801345916509}, new float[4] {-1.1172228848589787, 5.448566789132996e-10, -1.1172228848589787, 5.448566789132996e-10});
-    l2->copyWeightBias(new float[4] {-1.9048641164238775, 1.2619510820705655, -1.9048641164238775, 1.2619510820705655}, new float[2] {-0.12816004082232135, -0.12816004082232135});
-
-    n->showInfoAboutNetwork();
-    n->showWeightsBiasesLayers();
-
-    float* res = new float[4];
-
-    n->initForward(1);
-
-    n->showAuxiliarExpandReduceMatrices();
-
-    n->forward(1, new float[2 * 1] { 1, 1 }, res);
-
-    n->showForwardMatrices();
-
-    imprimirMatrizPorPantalla("Resultado forward host: ", res, 1, 1);
-
-    n->finalizeForwardBackward();
-
-    delete n;
-    */
-
-    //PRUEBA VELOCIDAD FORWARD
-
-    /*
-    Network* n = new Network(256, 2, 3, new Layer * [3] {
-        new Layer(256, ELU, dELU),
-        new Layer(256, ELU, dELU),
-        new Layer(256, Linear, dLinear)
-    });
-
-    float* inp = new float[256];
-    float* res = new float[256];
-
-    n->initForward(1);
-
-    std::chrono::time_point<std::chrono::system_clock> startCPU, endCPU;
-
-    for (int i = 0; i < 100; i++) {
-        startCPU = std::chrono::system_clock::now();
-
-        n->forward(1, inp, res);
-
-        endCPU = std::chrono::system_clock::now();
-
-        std::chrono::duration<double> elapsed_seconds = endCPU - startCPU;
-        std::time_t end_time = std::chrono::system_clock::to_time_t(endCPU);
-
-        std::cout << "elapsed time: " << elapsed_seconds.count() << "s; " << elapsed_seconds.count() * 1000 << "ms\n";
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 9; j++) {
+            misdatos[i * 9 + j] = (j+1) * (i+1);
+        }
     }
 
-    n->finalizeForwardBackward();
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
 
-    delete n;
+    imprimirMatrizPorPantalla("a", misdatos, 3, 9);
+    imprimirMatrizPorPantalla("b", misdatos_cop, 3, 9);
+
+    p->showDeviceMatrix("c", stream);
+    p->copyHostToDevice(misdatos, 4, stream);
+    cudaStreamSynchronize(stream);
+    p->showDeviceMatrix("d", stream);
+
+    imprimirMatrizPorPantalla("e", misdatos, 3, 9);
+    imprimirMatrizPorPantalla("f", misdatos_cop, 3, 9);
+
+    p->showDeviceMatrix("g", stream);
+    p->copyDeviceToHost(misdatos_cop, stream);
+    cudaStreamSynchronize(stream);
+    p->showDeviceMatrix("h", stream);
+
+    imprimirMatrizPorPantalla("i", misdatos, 3, 9);
+    imprimirMatrizPorPantalla("j", misdatos_cop, 3, 9);
+
+    float** d_pointers = p->generateDeviceRowsPointers(0, 3, new int[3] {0, 1, 2});
+    float** hd_pointers = new float* [3];
+    cudaMemcpy(hd_pointers, d_pointers, 3*sizeof(float*), cudaMemcpyDeviceToHost);
+
+    for (int i = 0; i < 3; i++) {
+        float* hrow = new float[9];
+        cudaMemcpy(hrow, hd_pointers[i], 9*sizeof(float), cudaMemcpyDeviceToHost);
+        imprimirMatrizPorPantalla("vector xd: ", hrow, 1, 9);
+        delete hrow;
+    }
+
+    float* d_copy = 0;
+    cudaMalloc(&d_copy, 3*9*sizeof(float));
+    p->copyToDevice(d_copy, 3, stream);
+
+    float* h_copy = new float[3 * 9];
+    cudaMemcpy(h_copy, d_copy, 3 * 9 * sizeof(float), cudaMemcpyDeviceToHost);
+
+    imprimirMatrizPorPantalla("h_copy: ", h_copy, 3, 9);
+
+    //cudaFree(d_copy);
+    cudaMalloc(&d_copy, 3 * 9 * sizeof(float));
+
+    h_copy = new float[3 * 9];
+    cudaMemcpy(h_copy, d_copy, 3 * 9 * sizeof(float), cudaMemcpyDeviceToHost);
+    imprimirMatrizPorPantalla("h_copy thrash: ", h_copy, 3, 9);
+    delete h_copy;
+
+    p->copyFromDevice(d_copy, 3, stream);
+
+    p->showDeviceMatrix("final", stream);
+
+    delete p;
     */
 
     return 0;

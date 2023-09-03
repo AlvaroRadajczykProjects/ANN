@@ -15,12 +15,16 @@
     <CudaCompile Include="CUDAKernels.cu" />
     <CudaCompile Include="HostPinnedDeviceMatrix.cu" />
     <CudaCompile Include="kernel.cu" />
+    <CudaCompile Include="Layer.cu" />
+    <CudaCompile Include="Network.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ActivationLossFunctions.cuh" />
     <ClInclude Include="CUDAKernels.cuh" />
     <ClInclude Include="funciones_archivos.h" />
     <ClInclude Include="HostPinnedDeviceMatrix.cuh" />
+    <ClInclude Include="Layer.cuh" />
+    <ClInclude Include="Network.cuh" />
     <ClInclude Include="PrintUtils.h" />
   </ItemGroup>
   <ItemGroup>
