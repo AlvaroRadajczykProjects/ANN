@@ -74,7 +74,7 @@ int main() {
     printf("Random number: %d\n", nrand);
     printf("Random number 2: %d\n", nrand2);
 
-    Network* n = new Network(256, 1, 1, new Layer * [3] {
+    Network* n = new Network(256, 1, 3, new Layer * [3] {
         new Layer(256, ELU, dELU),
         new Layer(256, ELU, dELU),
         new Layer(256, Linear, dLinear),
