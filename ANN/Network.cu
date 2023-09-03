@@ -351,9 +351,9 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 			//apply cost function
 			for (int i = 0; i < number_networks; i++) {
 				managedApplyLossFunction(stream_principal, max_num_threads, num_elems_batch,
-					layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch),
-					output_train->getDevicePointer() + (batch_ids[i] * num_elems_batch),
-					d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch),
+					layers[number_layers - 1]->getDeviceForward() + (i * output_size),
+					output_train->getDevicePointer() + (batch_ids[i] * output_size),
+					d_auxiliar_matrix_loss_function_error_backprop + (i * output_size),
 					loss_function
 				);
 			}
@@ -374,9 +374,9 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 			//apply loss function
 			for (int i = 0; i < number_networks; i++) {
 				managedApplyLossFunction(stream_principal, max_num_threads, num_elems_batch,
-					layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch),
-					output_train->getDevicePointer() + (batch_ids[i] * num_elems_batch),
-					d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch),
+					layers[number_layers - 1]->getDeviceForward() + (i * output_size),
+					output_train->getDevicePointer() + (batch_ids[i] * output_size),
+					d_auxiliar_matrix_loss_function_error_backprop + (i * output_size),
 					derivative_loss_function
 				);
 			}
@@ -430,7 +430,8 @@ void Network::applyVGradSGD(float lrate) {
 
 float* Network::validationGetCostFunctionAndCalculateLossFunction(int num_examples, int offset_id) {
 	int* pos = new int[number_networks];
-	for (int i = 0; i < number_networks; i++) { pos[i] = offset_id; }
+	for (int i = 0; i < number_networks; i++) { pos[i] = 0; }
+	//printf("\nOFFSET ID: %d; NUMBER EXAMPLES: %d", offset_id, num_examples);
 	float* res = validationGetCostFunctionAndCalculateLossFunction(num_examples, num_examples, offset_id, pos);
 	delete pos;
 	return res;
@@ -450,9 +451,9 @@ float* Network::validationGetCostFunctionAndCalculateLossFunction(int num_exampl
 			//apply cost function
 			for (int i = 0; i < number_networks; i++) {
 				managedApplyLossFunction(stream_principal, max_num_threads, num_elems_batch,
-					layers[number_layers - 1]->getDeviceForward() + (i * num_elems_batch),
-					output_validation->getDevicePointer() + (batch_ids[i] * num_elems_batch),
-					d_auxiliar_matrix_loss_function_error_backprop + (i * num_elems_batch),
+					layers[number_layers - 1]->getDeviceForward() + (i * output_size),
+					output_validation->getDevicePointer() + (batch_ids[i] * output_size),
+					d_auxiliar_matrix_loss_function_error_backprop + (i * output_size),
 					loss_function
 				);
 			}
@@ -492,7 +493,7 @@ float* Network::validationGetCostFunctionAndCalculateLossFunction(int num_exampl
 void Network::epochAllExamplesSGD(float lrate, int number_train_batches, int number_remainder_train_examples, int repeat_train_arr, int number_validation_batches, int number_remainder_validation_examples, int repeat_validation_arr, int* train_indices, int* val_indices, float* cost_train, float* cost_val, int* early_counters) {
 
 	memset(train_indices, 0, number_train_batches * repeat_train_arr * sizeof(float));
-	for (int i = 0; i < number_train_batches; i++) { train_indices[i] = i; }
+	for (int i = 0; i < number_train_batches; i++) { train_indices[i] = i * max_batch_size; }
 	edu_shuffle(train_indices, number_train_batches);
 	for (int i = 1; i < repeat_train_arr; i++) { memcpy(train_indices + i * number_train_batches, train_indices, number_train_batches * sizeof(int)); }
 
@@ -501,15 +502,15 @@ void Network::epochAllExamplesSGD(float lrate, int number_train_batches, int num
 	printf("\n");*/
 
 	memset(val_indices, 0, number_validation_batches * repeat_validation_arr * sizeof(float));
-	for (int i = 0; i < number_validation_batches; i++) { val_indices[i] = i; }
+	for (int i = 0; i < number_validation_batches; i++) { val_indices[i] = i * max_batch_size; }
 	edu_shuffle(val_indices, number_validation_batches);
 	for (int i = 1; i < repeat_validation_arr; i++) { memcpy(val_indices + i * number_validation_batches, val_indices, number_validation_batches * sizeof(int)); }
-
+	
 	/*printf("\nIndices validacion: ");
 	for (int i = 0; i < number_validation_batches * repeat_validation_arr; i++) { printf("%d, ", val_indices[i]); }
 	printf("\n");*/
 
-	for (int i = 0; i < max(1, number_train_batches - number_networks); i++) {
+	for (int i = 0; i < max(1, number_train_batches - number_networks + 1); i++) {
 		float* tmp_res_cost_train = backwardPhase(number_train_batches * max_batch_size, max_batch_size, 0, train_indices + i, early_counters);
 		applyVGradSGD(lrate);
 		for (int j = 0; j < number_networks; j++) { cost_train[j] += tmp_res_cost_train[j] * max_batch_size / (float)max_train_number_examples; }
@@ -517,22 +518,22 @@ void Network::epochAllExamplesSGD(float lrate, int number_train_batches, int num
 	}
 	if (number_remainder_train_examples > 0) {
 		//printf("\nResto de entrenamiento en: %d\n", max_train_number_examples - number_remainder_train_examples);
-		float* tmp_res_cost_train = backwardPhase(number_remainder_train_examples, number_train_batches, early_counters);
+		float* tmp_res_cost_train = backwardPhase(number_remainder_train_examples, max_train_number_examples - number_remainder_train_examples, early_counters);
 		applyVGradSGD(lrate);
 		for (int j = 0; j < number_networks; j++) { cost_train[j] += tmp_res_cost_train[j] * number_remainder_train_examples / (float)max_train_number_examples; }
 		delete tmp_res_cost_train;
 	}
 
-	for (int i = 0; i < max(1, number_validation_batches - number_networks); i++) {
+	for (int i = 0; i < max(1, number_validation_batches - number_networks + 1); i++) {
 		float* tmp_res_cost_val = validationGetCostFunctionAndCalculateLossFunction(number_validation_batches * max_batch_size, max_batch_size, 0, val_indices + i);
 		for (int j = 0; j < number_networks; j++) { cost_val[j] += tmp_res_cost_val[j] * max_batch_size / (float)max_validation_number_examples; }
 		delete tmp_res_cost_val;
 	}
-	/*if (number_remainder_validation_examples > 0) {
-		float* tmp_res_cost_val = validationGetCostFunctionAndCalculateLossFunction(number_remainder_validation_examples, number_validation_batches);
+	if (number_remainder_validation_examples > 0) {
+		float* tmp_res_cost_val = validationGetCostFunctionAndCalculateLossFunction(number_remainder_validation_examples, max_validation_number_examples - number_remainder_validation_examples);
 		for (int j = 0; j < number_networks; j++) { cost_val[j] += tmp_res_cost_val[j] * number_remainder_validation_examples / (float)max_validation_number_examples; }
 		delete tmp_res_cost_val;
-	}*/
+	}
 
 }
 
@@ -546,13 +547,13 @@ void Network::trainAllExamplesMaxBatchSGD(int nepochs, int show_per_epoch, float
 	int number_remainder_validation_examples = max_validation_number_examples % max_batch_size;
 	int repeat_validation_arr = (int) ceil( (number_validation_batches + number_networks - 1) / (float)number_validation_batches);
 
-	printf("\nnumber_train_batches: %d", number_train_batches);
+	/*printf("\nnumber_train_batches: %d", number_train_batches);
 	printf("\nnumber_remainder_train_examples: %d", number_remainder_train_examples);
 	printf("\nrepeat_train_arr: %d", repeat_train_arr);
 
 	printf("\nnumber_validation_batches: %d", number_validation_batches);
 	printf("\nnumber_remainder_validation_examples: %d", number_remainder_validation_examples);
-	printf("\nrepeat_validation_arr: %d\n", repeat_validation_arr);
+	printf("\nrepeat_validation_arr: %d\n", repeat_validation_arr);*/
 
 	int* train_indices = new int[number_train_batches * repeat_train_arr];
 	int* val_indices = new int[number_validation_batches * repeat_validation_arr];

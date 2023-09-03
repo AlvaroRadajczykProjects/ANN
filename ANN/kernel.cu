@@ -91,7 +91,7 @@ int main() {
     n->copyInputOutputTrain(nrand, input, output);
     n->copyInputOutputValidation(nrand2, input2, output2);
 
-    n->trainAllExamplesMaxBatchSGD(5000, 500, 0.1, 0.0001, 6, 0.00001);
+    n->trainAllExamplesMaxBatchSGD(10000, 500, 0.1, 0.0001, 6, 0.00001);
 
     //n->showForwardMatrices();
 

@@ -93,6 +93,7 @@ void HostPinnedDeviceMatrix::copyToDevice(float* d_ptr, int nrows, cudaStream_t 
 float** HostPinnedDeviceMatrix::generateDeviceRowsPointers(int row_offset, int num_rows, int* row_ids) {
 	for (int i = 0; i < num_rows; i++) {
 		row_ids[i] += row_offset;
+		//printf("\nrow_ids[%d] = %d", i, row_ids[i]);
 		if (row_ids[i] >= number_rows) {
 			printf("\n\nError host HostPinnedDeviceMatrix generateDeviceRowsPointers: invalid row_id (in %d, %d >= %d)\n\n", i, row_ids[i], number_rows);
 			exit(EXIT_FAILURE);
