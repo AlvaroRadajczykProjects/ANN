@@ -22,6 +22,7 @@
 #ifndef CUDA_KERNELS
 #define CUDA_KERNELS
 
+using func_lrate = float(*) (int);
 using func_t = float(*) (float);
 using func2_t = float(*) (float, float);
 using func3_t = float(*) (float, float, float);

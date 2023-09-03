@@ -537,7 +537,7 @@ void Network::epochAllExamplesSGD(float lrate, int number_train_batches, int num
 
 }
 
-void Network::trainAllExamplesMaxBatchSGD(int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop, float learning_rate) {
+void Network::trainAllExamplesMaxBatchSGD(int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop, func_lrate function_learning_rate) {
 
 	int number_train_batches = max_train_number_examples / max_batch_size;
 	int number_remainder_train_examples = max_train_number_examples % max_batch_size;
@@ -571,7 +571,8 @@ void Network::trainAllExamplesMaxBatchSGD(int nepochs, int show_per_epoch, float
 	for (int i = 0; i < nepochs; i++) {
 		memset(cost_train, 0, number_networks * sizeof(float));
 		memset(cost_val, 0, number_networks * sizeof(float));
-		epochAllExamplesSGD(learning_rate, number_train_batches, number_remainder_train_examples, repeat_train_arr, number_validation_batches, number_remainder_validation_examples, repeat_validation_arr, train_indices, val_indices, cost_train, cost_val, early_stop_counters);
+		float lrate = function_learning_rate(i);
+		epochAllExamplesSGD(lrate, number_train_batches, number_remainder_train_examples, repeat_train_arr, number_validation_batches, number_remainder_validation_examples, repeat_validation_arr, train_indices, val_indices, cost_train, cost_val, early_stop_counters);
 
 		bool all_zero = true;
 		for (int j = 0; j < number_networks; j++) {

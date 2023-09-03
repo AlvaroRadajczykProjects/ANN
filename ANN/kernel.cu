@@ -31,6 +31,11 @@ func_t d_func = 0;
 func2_t d_func2 = 0;
 func3_t d_func3 = 0;
 
+//first epoch number is 0
+float lrate_func(int epoch) {
+    return 0.00001;
+}
+
 int main() {
 
     srand(time(NULL));
@@ -91,7 +96,7 @@ int main() {
     n->copyInputOutputTrain(nrand, input, output);
     n->copyInputOutputValidation(nrand2, input2, output2);
 
-    n->trainAllExamplesMaxBatchSGD(10000, 500, 0.1, 0.0001, 6, 0.00001);
+    n->trainAllExamplesMaxBatchSGD(10000, 500, 0.1, 0.0001, 6, lrate_func);
 
     //n->showForwardMatrices();
 
