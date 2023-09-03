@@ -14,9 +14,10 @@ void manageCUDAError(cudaError_t status, char* description) {
     }
 }
 
-int nextFourMultiple(int val) {
-    if (val % 4 == 0) { return val; }
-    else { return val + (4 - (val % 4)); }
+unsigned long long nextMultiple(unsigned long long val, int mod) {
+    if (val == 0) { return mod; }
+    if (val % mod == 0) { return val; }
+    return val + (mod - (val % mod));
 }
 
 const void matrizTraspuestaDevice(cublasHandle_t handle, float* odata, float* idata, int m, int n) {

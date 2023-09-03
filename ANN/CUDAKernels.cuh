@@ -19,6 +19,9 @@
 #include <iostream>
 #include <cassert>
 
+#ifndef CUDA_KERNELS
+#define CUDA_KERNELS
+
 using func_t = float(*) (float);
 using func2_t = float(*) (float, float);
 using func3_t = float(*) (float, float, float);
@@ -31,7 +34,7 @@ void edu_shuffle(int arr[], int n);
 
 void manageCUDAError(cudaError_t status, char* description);
 
-int nextFourMultiple(int val);
+unsigned long long nextMultiple(unsigned long long val, int mod);
 
 const void matrizTraspuestaDevice(cublasHandle_t handle, float* odata, float* idata, int m, int n);
 
@@ -78,3 +81,5 @@ const void managedMultiplyAllElementsByConstant(cudaStream_t stream, int max_num
 const void managedSumVectorsSameDimensions(cudaStream_t stream, int max_num_threads, int num_elems, float* dst, float* src);
 
 const void managedMultiplyMatricesSameDimensions(cudaStream_t stream, int max_num_threads, int num_elems, float* dst, float* src);
+
+#endif

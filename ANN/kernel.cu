@@ -1,7 +1,8 @@
 ﻿#include <stdio.h>
 #include <chrono>
 
-#include "Network.cuh"
+#include "ActivationLossFunctions.cuh"
+#include "HostPinnedDeviceMatrix.cuh"
 
 #define N 20
 
@@ -54,38 +55,42 @@ int main() {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    HostPinnedDeviceMatrix* p = new HostPinnedDeviceMatrix(3, 9, 4);
+
+    float* misdatos = new float[3 * 9];
+    float* misdatos_cop = new float[3 * 9];
+
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 9; j++) {
+            misdatos[i * 9 + j] = j+1;
+        }
+    }
+
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
     /*
-    Network* n = new Network(256, 1, 3, new Layer * [3] {
-        new Layer(256, ELU, dELU),
-        new Layer(256, ELU, dELU),
-        new Layer(256, Linear, dLinear),
-    }, MSE, dMSE);
+    imprimirMatrizPorPantalla("a", misdatos, 3, 9);
+    imprimirMatrizPorPantalla("b", misdatos_cop, 3, 9);
 
-    n->initWeightBiasValues();
+    p->showDeviceMatrix("c", stream);
+    p->copyHostToDevice(misdatos, stream);
+    cudaStreamSynchronize(stream);
+    p->showDeviceMatrix("d", stream);
 
-    //n->showWeightsBiasesLayers();
+    imprimirMatrizPorPantalla("e", misdatos, 3, 9);
+    imprimirMatrizPorPantalla("f", misdatos_cop, 3, 9);
 
-    float* input = new float[256*144];
-    float* output = new float[256 * 144];
+    p->showDeviceMatrix("g", stream);
+    p->copyDeviceToHost(misdatos_cop, stream);
+    cudaStreamSynchronize(stream);
+    p->showDeviceMatrix("h", stream);
 
-    for (int i = 0; i < 256 * 144; i++) { input[i] = 10; output[i] = 0; }
-
-    n->initForwardTrain(144, 144, 32);
-
-    n->copyInputOutputTrain(144, input, output);
-    n->copyInputOutputValidation(144, input, output);
-
-    n->trainAllExamplesMaxBatchSGD(20000, 500, 0.00000001, 0.0000001, 6, 0.01);
-
-    n->trainGetCostFunctionAndCalculateLossFunction(32, 0);
-    n->showForwardMatrices();
-
-    n->finalizeForwardBackward();
-
-    n->storeNetworkInFile("network.data");
-
-    delete n;
+    imprimirMatrizPorPantalla("i", misdatos, 3, 9);
+    imprimirMatrizPorPantalla("j", misdatos_cop, 3, 9);
     */
+
+    delete p;
 
     /*
     Network* n = new Network(256, 1, 3, new Layer * [3] {

@@ -8,11 +8,8 @@
     <CudaCompile Include="CUDAKernels.cu">
       <Filter>CUDAKernels</Filter>
     </CudaCompile>
-    <CudaCompile Include="Layer.cu">
-      <Filter>Classes\Layer</Filter>
-    </CudaCompile>
-    <CudaCompile Include="Network.cu">
-      <Filter>Classes\Network</Filter>
+    <CudaCompile Include="HostPinnedDeviceMatrix.cu">
+      <Filter>Classes\HostPinnedDeviceMatrix</Filter>
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>
@@ -25,13 +22,10 @@
     <ClInclude Include="PrintUtils.h">
       <Filter>PrintUtils</Filter>
     </ClInclude>
-    <ClInclude Include="Layer.cuh">
-      <Filter>Classes\Layer</Filter>
-    </ClInclude>
-    <ClInclude Include="Network.cuh">
-      <Filter>Classes\Network</Filter>
-    </ClInclude>
     <ClInclude Include="funciones_archivos.h" />
+    <ClInclude Include="HostPinnedDeviceMatrix.cuh">
+      <Filter>Classes\HostPinnedDeviceMatrix</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ActivationLossFunctions">
@@ -51,6 +45,9 @@
     </Filter>
     <Filter Include="Classes\Network">
       <UniqueIdentifier>{9b5c2f0c-0bd8-43b9-ad6c-1a11417a3350}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Classes\HostPinnedDeviceMatrix">
+      <UniqueIdentifier>{fa90aaf0-1a96-44d2-bc15-3e12d3975426}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
