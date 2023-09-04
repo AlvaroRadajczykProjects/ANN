@@ -1,4 +1,5 @@
 #include "CUDAKernels.cuh"
+#include "BackpropFunctions.cuh"
 #include "PrintUtils.h"
 
 #ifndef LAYER
@@ -99,6 +100,7 @@ class Layer {
         void backward(cudaStream_t stream, float** input_pointers, int num_outputs);
 
         void applyGradientSGD(cudaStream_t stream, float lrate);
+        void applyGradientAdam(cudaStream_t stream, float lrate, float* params, int nparams);
 
         void allocWeightMatricesMemory();
         void freeWeightMatricesMemory();

@@ -16,12 +16,15 @@ void applyVGradSGD(Network* n, float lrate, float* params, int nparams) {
 
 //params: b1, b2, epsilon
 void applyVGradAdam(Network* n, float lrate, float* params, int nparams) {
-	if (nparams != 0) {
+	if (nparams != 3) {
 		printf("\nNetwork applyVGradSGD: incorrect number of parameters (expected 3, received %d)", nparams);
 		exit(EXIT_FAILURE);
 	}
+	//printf("\nParams: ");
+	//for (int i = 0; i < nparams; i++) { printf("%.16f, ", params[i]); }
+	//printf("\n");
 	for (int i = 0; i < n->getNumberLayers(); i++) {
-		n->getLayers()[i]->applyGradientSGD(n->getStreamPrincipal(), 0);
+		n->getLayers()[i]->applyGradientAdam(n->getStreamPrincipal(), lrate, params, nparams);
 	}
 }
 
@@ -565,7 +568,7 @@ void Network::epochAllExamples(float lrate, float* params, int nparams, func_bac
 
 }
 
-void Network::trainAllExamplesMaxBatch(func_lrate function_learning_rate, float* params, int nparams, func_backprop backprop_function, int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop) {
+void Network::trainAllExamplesMaxBatch(func_lrate function_learning_rate, int nparams, float* params, func_backprop backprop_function, int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop) {
 
 	int number_train_batches = max_train_number_examples / max_batch_size;
 	int number_remainder_train_examples = max_train_number_examples % max_batch_size;

@@ -96,7 +96,8 @@ int main() {
     n->copyInputOutputTrain(nrand, input, output);
     n->copyInputOutputValidation(nrand2, input2, output2);
 
-    n->trainAllExamplesMaxBatch(lrate_func, NULL, 0, applyVGradSGD, 10000, 500, 0.1, 0.0001, 6);
+    //n->trainAllExamplesMaxBatch(lrate_func, NULL, 0, applyVGradSGD, 10000, 500, 0.1, 0.0001, 6);
+    n->trainAllExamplesMaxBatch(lrate_func, 3, new float[3]{ 0.9, 0.999, 0.00000001 }, applyVGradAdam, 10000, 500, 0.1, 0.000001, 10);
 
     n->showForwardMatrices();
 

@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="ActivationLossFunctions.cu" />
+    <CudaCompile Include="BackpropFunctions.cu" />
     <CudaCompile Include="CUDAKernels.cu" />
     <CudaCompile Include="HostPinnedDeviceMatrix.cu" />
     <CudaCompile Include="kernel.cu" />
@@ -20,6 +21,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ActivationLossFunctions.cuh" />
+    <ClInclude Include="BackpropFunctions.cuh" />
     <ClInclude Include="CUDAKernels.cuh" />
     <ClInclude Include="funciones_archivos.h" />
     <ClInclude Include="HostPinnedDeviceMatrix.cuh" />

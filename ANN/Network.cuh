@@ -105,7 +105,7 @@ class Network {
         void epochAllExamples(float lrate, float* params, int nparams, func_backprop backprop_function, int number_train_batches, int number_remainder_train_examples, int repeat_train_arr, int number_validation_batches, int number_remainder_validation_examples, int repeat_validation_arr, int* train_indices, int* val_indices, float* cost_train, float* cost_val, int* early_counters);
 
         //first func_lrate parameter value (number of first epoch) is 0, not 1
-        void trainAllExamplesMaxBatch(func_lrate function_learning_rate, float* params, int nparams, func_backprop backprop_function, int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop);
+        void trainAllExamplesMaxBatch(func_lrate function_learning_rate, int nparams, float* params, func_backprop backprop_function, int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop);
 
         void finalizeForwardBackward();
 

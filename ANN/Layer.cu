@@ -279,6 +279,23 @@ void Layer::applyGradientSGD(cudaStream_t stream, float lrate) {
     managedSumVectorsSameDimensions(stream, max_num_threads, nextFourMultiple(size * number_networks), d_array_bias_vector, d_error_array_bias_vector);
 }
 
+void Layer::applyGradientAdam(cudaStream_t stream, float lrate, float* params, int nparams) {
+    //void managedActualizarValoresMatrizMomentoAdam(cudaStream_t stream, int max_threads_block, const float* grad, float* mdst, float b1, int nrows, int ncols);
+    //void managedActualizarValoresMatrizVelocidadAdam(cudaStream_t stream, int max_threads_block, const float* grad, float* mdst, float b2, int nrows, int ncols);
+    //void managedCalcularVectorGradienteAdam(cudaStream_t stream, int max_threads_block, float tapren, float b1, float b2, float epsilon, float* mdst, const float* mom, const float* vel, int nrows, int ncols);
+    managedActualizarValoresMatrizMomentoAdam(stream, max_num_threads, d_error_array_weight_matrix, d_weight_matrix_momentum, params[0], input_size * number_networks, size);
+    managedActualizarValoresMatrizMomentoAdam(stream, max_num_threads, d_error_array_bias_vector, d_bias_vector_momentum, params[0], number_networks, size);
+
+    managedActualizarValoresMatrizVelocidadAdam(stream, max_num_threads, d_error_array_weight_matrix, d_weight_matrix_velocity, params[1], input_size * number_networks, size);
+    managedActualizarValoresMatrizVelocidadAdam(stream, max_num_threads, d_error_array_bias_vector, d_bias_vector_velocity, params[1], number_networks, size);
+
+    managedCalcularVectorGradienteAdam(stream, max_num_threads, lrate, params[0], params[1], params[2], d_error_array_weight_matrix, d_weight_matrix_momentum, d_weight_matrix_velocity, input_size * number_networks, size);
+    managedCalcularVectorGradienteAdam(stream, max_num_threads, lrate, params[0], params[1], params[2], d_error_array_bias_vector, d_bias_vector_momentum, d_bias_vector_velocity, number_networks, size);
+
+    managedSumVectorsSameDimensions(stream, max_num_threads, nextFourMultiple(input_size * size * number_networks), d_array_weight_matrix, d_error_array_weight_matrix);
+    managedSumVectorsSameDimensions(stream, max_num_threads, nextFourMultiple(size * number_networks), d_array_bias_vector, d_error_array_bias_vector);
+}
+
 void Layer::allocWeightMatricesMemory() {
     if (input_size > 0 && size > 0 && number_networks > 0) {
         cudaMalloc( &d_array_weight_matrix, nextFourMultiple(input_size * size * number_networks) * sizeof(float));
