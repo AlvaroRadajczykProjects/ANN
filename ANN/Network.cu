@@ -3,6 +3,28 @@
 
 using namespace std;
 
+//no params
+void applyVGradSGD(Network* n, float lrate, float* params, int nparams) {
+	if (nparams != 0) {
+		printf("\nNetwork applyVGradSGD: incorrect number of parameters (expected 0, received %d)", nparams);
+		exit(EXIT_FAILURE);
+	}
+	for (int i = 0; i < n->getNumberLayers(); i++) {
+		n->getLayers()[i]->applyGradientSGD(n->getStreamPrincipal(), lrate);
+	}
+}
+
+//params: b1, b2, epsilon
+void applyVGradAdam(Network* n, float lrate, float* params, int nparams) {
+	if (nparams != 0) {
+		printf("\nNetwork applyVGradSGD: incorrect number of parameters (expected 3, received %d)", nparams);
+		exit(EXIT_FAILURE);
+	}
+	for (int i = 0; i < n->getNumberLayers(); i++) {
+		n->getLayers()[i]->applyGradientSGD(n->getStreamPrincipal(), 0);
+	}
+}
+
 Network::Network(int is, int nn, int nl, Layer** ls, func2_t ls_fn, func2_t dls_fn) {
 	cudaDeviceProp deviceProp;
 	cudaGetDeviceProperties(&deviceProp, 0);
@@ -105,6 +127,18 @@ void Network::showForwardMatrices() {
 
 int Network::getNumberNetwors() {
 	return number_networks;
+}
+
+int Network::getNumberLayers() {
+	return number_layers;
+}
+
+Layer** Network::getLayers() {
+	return layers;
+}
+
+cudaStream_t Network::getStreamPrincipal() {
+	return stream_principal;
 }
 
 void Network::initForward(int max_num_input_examples_expected) {
@@ -393,41 +427,6 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 	return NULL;
 }
 
-float* Network::backwardPhase(int num_examples, int offset_id, int* early_counters) {
-	int* pos = new int[number_networks];
-	for (int i = 0; i < number_networks; i++) { pos[i] = 0; }
-	float* res = backwardPhase(num_examples, num_examples, offset_id, pos, early_counters);
-	delete pos;
-	return res;
-}
-
-float* Network::backwardPhase(int num_examples, int batch_size, int offset_id, int* batch_ids, int* early_counters) {
-	if (num_examples <= max_train_number_examples && batch_size <= max_batch_size) {
-		if (num_examples % batch_size == 0) {
-			float* cost_function = trainGetCostFunctionAndCalculateLossFunction(num_examples, batch_size, offset_id, batch_ids);
-			if(early_counters!= NULL){ noBackwardNetworksOutCounter(batch_size, early_counters); }
-			for (int i = number_layers - 1; i > 0; i--) {
-				layers[i]->backward(stream_principal, layers[i - 1], batch_size);
-			}
-			layers[0]->backward(stream_principal, d_input_train_pointers, batch_size);
-			return cost_function;
-		}
-		else {
-			printf("\nwhen batch backwardPhase, num_examples % batch_size must be 0");
-		}
-	}
-	else {
-		printf("\nCannot make forward, more examples than max number of examples defined in initForwardTrain");
-	}
-	return NULL;
-}
-
-void Network::applyVGradSGD(float lrate) {
-	for (int i = 0; i < number_layers; i++) {
-		layers[i]->applyGradientSGD(stream_principal, lrate);
-	}
-}
-
 float* Network::validationGetCostFunctionAndCalculateLossFunction(int num_examples, int offset_id) {
 	int* pos = new int[number_networks];
 	for (int i = 0; i < number_networks; i++) { pos[i] = 0; }
@@ -442,7 +441,7 @@ float* Network::validationGetCostFunctionAndCalculateLossFunction(int num_exampl
 	if (num_examples <= max_validation_number_examples && batch_size <= max_batch_size) {
 		if (num_examples % batch_size == 0) {
 			int num_elems_batch = batch_size * input_size;
-			
+
 			d_input_validation_pointers = input_validation->generateDeviceRowsPointers(offset_id, number_networks, batch_ids);
 			forwardTrain(num_examples, batch_size, d_input_validation_pointers);
 
@@ -490,7 +489,36 @@ float* Network::validationGetCostFunctionAndCalculateLossFunction(int num_exampl
 	return NULL;
 }
 
-void Network::epochAllExamplesSGD(float lrate, int number_train_batches, int number_remainder_train_examples, int repeat_train_arr, int number_validation_batches, int number_remainder_validation_examples, int repeat_validation_arr, int* train_indices, int* val_indices, float* cost_train, float* cost_val, int* early_counters) {
+float* Network::backwardPhase(int num_examples, int offset_id, int* early_counters) {
+	int* pos = new int[number_networks];
+	for (int i = 0; i < number_networks; i++) { pos[i] = 0; }
+	float* res = backwardPhase(num_examples, num_examples, offset_id, pos, early_counters);
+	delete pos;
+	return res;
+}
+
+float* Network::backwardPhase(int num_examples, int batch_size, int offset_id, int* batch_ids, int* early_counters) {
+	if (num_examples <= max_train_number_examples && batch_size <= max_batch_size) {
+		if (num_examples % batch_size == 0) {
+			float* cost_function = trainGetCostFunctionAndCalculateLossFunction(num_examples, batch_size, offset_id, batch_ids);
+			if(early_counters!= NULL){ noBackwardNetworksOutCounter(batch_size, early_counters); }
+			for (int i = number_layers - 1; i > 0; i--) {
+				layers[i]->backward(stream_principal, layers[i - 1], batch_size);
+			}
+			layers[0]->backward(stream_principal, d_input_train_pointers, batch_size);
+			return cost_function;
+		}
+		else {
+			printf("\nwhen batch backwardPhase, num_examples % batch_size must be 0");
+		}
+	}
+	else {
+		printf("\nCannot make forward, more examples than max number of examples defined in initForwardTrain");
+	}
+	return NULL;
+}
+
+void Network::epochAllExamples(float lrate, float* params, int nparams, func_backprop backprop_function, int number_train_batches, int number_remainder_train_examples, int repeat_train_arr, int number_validation_batches, int number_remainder_validation_examples, int repeat_validation_arr, int* train_indices, int* val_indices, float* cost_train, float* cost_val, int* early_counters) {
 
 	memset(train_indices, 0, number_train_batches * repeat_train_arr * sizeof(float));
 	for (int i = 0; i < number_train_batches; i++) { train_indices[i] = i * max_batch_size; }
@@ -512,14 +540,14 @@ void Network::epochAllExamplesSGD(float lrate, int number_train_batches, int num
 
 	for (int i = 0; i < max(1, number_train_batches - number_networks + 1); i++) {
 		float* tmp_res_cost_train = backwardPhase(number_train_batches * max_batch_size, max_batch_size, 0, train_indices + i, early_counters);
-		applyVGradSGD(lrate);
+		backprop_function(this, lrate, params, nparams); //applyVGradSGD(lrate);
 		for (int j = 0; j < number_networks; j++) { cost_train[j] += tmp_res_cost_train[j] * max_batch_size / (float)max_train_number_examples; }
 		delete tmp_res_cost_train;
 	}
 	if (number_remainder_train_examples > 0) {
 		//printf("\nResto de entrenamiento en: %d\n", max_train_number_examples - number_remainder_train_examples);
 		float* tmp_res_cost_train = backwardPhase(number_remainder_train_examples, max_train_number_examples - number_remainder_train_examples, early_counters);
-		applyVGradSGD(lrate);
+		backprop_function(this, lrate, params, nparams);
 		for (int j = 0; j < number_networks; j++) { cost_train[j] += tmp_res_cost_train[j] * number_remainder_train_examples / (float)max_train_number_examples; }
 		delete tmp_res_cost_train;
 	}
@@ -537,7 +565,7 @@ void Network::epochAllExamplesSGD(float lrate, int number_train_batches, int num
 
 }
 
-void Network::trainAllExamplesMaxBatchSGD(int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop, func_lrate function_learning_rate) {
+void Network::trainAllExamplesMaxBatch(func_lrate function_learning_rate, float* params, int nparams, func_backprop backprop_function, int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop) {
 
 	int number_train_batches = max_train_number_examples / max_batch_size;
 	int number_remainder_train_examples = max_train_number_examples % max_batch_size;
@@ -572,7 +600,7 @@ void Network::trainAllExamplesMaxBatchSGD(int nepochs, int show_per_epoch, float
 		memset(cost_train, 0, number_networks * sizeof(float));
 		memset(cost_val, 0, number_networks * sizeof(float));
 		float lrate = function_learning_rate(i);
-		epochAllExamplesSGD(lrate, number_train_batches, number_remainder_train_examples, repeat_train_arr, number_validation_batches, number_remainder_validation_examples, repeat_validation_arr, train_indices, val_indices, cost_train, cost_val, early_stop_counters);
+		epochAllExamples(lrate, params, nparams, backprop_function, number_train_batches, number_remainder_train_examples, repeat_train_arr, number_validation_batches, number_remainder_validation_examples, repeat_validation_arr, train_indices, val_indices, cost_train, cost_val, early_stop_counters);
 
 		bool all_zero = true;
 		for (int j = 0; j < number_networks; j++) {
@@ -683,7 +711,7 @@ void Network::loadNetworkFromFile(char* name) {
 	unsigned long long num_elems = 0;
 	for (int i = 0; i < number_layers; i++) { num_elems += layers[i]->getTotalElementsBiasVectors() + layers[i]->getTotalElementsWeightMatrices(); }
 
-	if (num_elems != nnumeros) { printf("\nError loading Network: not same number of elements (total numbers of biases and weights)\n"); }
+	if (num_elems != nnumeros) { printf("\nError loading Network: not same number of elements (total numbers of biases and weights) %d %d\n", num_elems, nnumeros); }
 
 	unsigned long long offset = 0;
 	for (int i = 0; i < number_layers; i++) {

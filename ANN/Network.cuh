@@ -4,6 +4,13 @@
 #ifndef NETWORK
 #define NETWORK
 
+class Network;
+
+using func_backprop = void(*) (Network* n, float, float*, int);
+
+void applyVGradSGD(Network* n, float lrate, float* params, int nparams);
+void applyVGradAdam(Network* n, float lrate, float* params, int nparams);
+
 class Network {
     private:
         int max_num_threads;
@@ -67,6 +74,9 @@ class Network {
         void showForwardMatrices();
 
         int getNumberNetwors();
+        int getNumberLayers();
+        Layer** getLayers();
+        cudaStream_t getStreamPrincipal();
 
         void initForward( int max_num_input_examples_expected );
         void initForwardTrain(int max_train_examples, int max_validation_examples, int m_batch_size);
@@ -84,25 +94,25 @@ class Network {
         float* trainGetCostFunctionAndCalculateLossFunction(int num_examples, int offset_id);
         float* trainGetCostFunctionAndCalculateLossFunction(int num_examples, int batch_size, int offset_id, int* batch_ids);
 
-        void noBackwardNetworksOutCounter(int batch_size, int* early_counters);
+        float* validationGetCostFunctionAndCalculateLossFunction(int num_examples, int offset_id);
+        float* validationGetCostFunctionAndCalculateLossFunction(int num_examples, int batch_size, int offset_id, int* batch_ids);
 
         float* backwardPhase(int num_examples, int offset_id, int* early_counters);
         float* backwardPhase(int num_examples, int batch_size, int offset_id, int* batch_ids, int* early_counters);
 
-        void applyVGradSGD(float lrate);
+        void noBackwardNetworksOutCounter(int batch_size, int* early_counters);
 
-        float* validationGetCostFunctionAndCalculateLossFunction(int num_examples, int offset_id);
-        float* validationGetCostFunctionAndCalculateLossFunction(int num_examples, int batch_size, int offset_id, int* batch_ids);
-
-        void epochAllExamplesSGD(float lrate, int number_train_batches, int number_remainder_train_examples, int repeat_train_arr, int number_validation_batches, int number_remainder_validation_examples, int repeat_validation_arr, int* train_indices, int* val_indices, float* cost_train, float* cost_val, int* early_counters);
+        void epochAllExamples(float lrate, float* params, int nparams, func_backprop backprop_function, int number_train_batches, int number_remainder_train_examples, int repeat_train_arr, int number_validation_batches, int number_remainder_validation_examples, int repeat_validation_arr, int* train_indices, int* val_indices, float* cost_train, float* cost_val, int* early_counters);
 
         //first func_lrate parameter value (number of first epoch) is 0, not 1
-        void trainAllExamplesMaxBatchSGD( int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop, func_lrate function_learning_rate);
+        void trainAllExamplesMaxBatch(func_lrate function_learning_rate, float* params, int nparams, func_backprop backprop_function, int nepochs, int show_per_epoch, float convergence, float min_err_start_early_stop, int count_early_stop);
 
         void finalizeForwardBackward();
 
         void storeNetworkInFile(char* name);
         void loadNetworkFromFile(char* name);
+
+
 
         //void initBackwardADAM();
         //void finalizeBackwardADAM();

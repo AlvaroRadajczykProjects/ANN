@@ -33,7 +33,7 @@ func3_t d_func3 = 0;
 
 //first epoch number is 0
 float lrate_func(int epoch) {
-    return 0.00001;
+    return 0.001;
 }
 
 int main() {
@@ -88,17 +88,17 @@ int main() {
     float* input2 = new float[256 * nrand2];
     float* output2 = new float[256 * nrand2];
 
-    for (int i = 0; i < 256 * nrand; i++) { input[i] = 10; output[i] = 1; }
-    for (int i = 0; i < 256 * nrand2; i++) { input2[i] = 10; output2[i] = 1; }
+    for (int i = 0; i < 256 * nrand; i++) { input[i] = 100; output[i] = 2; }
+    for (int i = 0; i < 256 * nrand2; i++) { input2[i] = 100; output2[i] = 2; }
 
     n->initForwardTrain(nrand, nrand2, 32);
 
     n->copyInputOutputTrain(nrand, input, output);
     n->copyInputOutputValidation(nrand2, input2, output2);
 
-    n->trainAllExamplesMaxBatchSGD(10000, 500, 0.1, 0.0001, 6, lrate_func);
+    n->trainAllExamplesMaxBatch(lrate_func, NULL, 0, applyVGradSGD, 10000, 500, 0.1, 0.0001, 6);
 
-    //n->showForwardMatrices();
+    n->showForwardMatrices();
 
     n->finalizeForwardBackward();
 

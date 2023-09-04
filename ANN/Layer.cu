@@ -343,6 +343,17 @@ void Layer::allocBackwardMemory(int batch_size, float* d_aux_error_matrix, float
 
     cudaMalloc( &d_error_array_weight_matrix, nextFourMultiple(input_size * size * number_networks) * sizeof(float));
     cudaMalloc( &d_error_array_bias_vector, nextFourMultiple(size * number_networks) * sizeof(float));
+
+    cudaMalloc(&d_weight_matrix_momentum, nextFourMultiple(input_size * size * number_networks) * sizeof(float));
+    cudaMalloc(&d_bias_vector_momentum, nextFourMultiple(size * number_networks) * sizeof(float));
+    cudaMemset(d_weight_matrix_momentum, 0, nextFourMultiple(input_size * size * number_networks) * sizeof(float));
+    cudaMemset(d_bias_vector_momentum, 0, nextFourMultiple(size * number_networks) * sizeof(float));
+
+    cudaMalloc(&d_weight_matrix_velocity, nextFourMultiple(input_size * size * number_networks) * sizeof(float));
+    cudaMalloc(&d_bias_vector_velocity, nextFourMultiple(size * number_networks) * sizeof(float));
+    cudaMemset(d_weight_matrix_velocity, 0, nextFourMultiple(input_size * size * number_networks) * sizeof(float));
+    cudaMemset(d_bias_vector_velocity, 0, nextFourMultiple(size * number_networks) * sizeof(float));
+
     hd_error_weight_matrices_pointers = new float* [number_networks];
     hd_error_bias_vectors_pointers = new float* [number_networks];
     hd_auxiliar_error_forward_layer_pointers = new float* [number_networks];
@@ -379,6 +390,11 @@ void Layer::freeBackwardMemory() {
     if (hd_error_bias_vectors_pointers != NULL) { delete hd_error_bias_vectors_pointers; hd_error_bias_vectors_pointers = NULL; }
     if (d_error_weight_matrices_pointers != NULL) { cudaFree(d_error_weight_matrices_pointers); d_error_weight_matrices_pointers = NULL; }
     if (d_error_bias_vectors_pointers != NULL) { cudaFree(d_error_bias_vectors_pointers); d_error_bias_vectors_pointers = NULL; }
+
+    if (d_weight_matrix_momentum != NULL) { cudaFree(d_weight_matrix_momentum); d_weight_matrix_momentum = NULL; }
+    if (d_bias_vector_momentum != NULL) { cudaFree(d_bias_vector_momentum); d_bias_vector_momentum = NULL; }
+    if (d_weight_matrix_velocity != NULL) { cudaFree(d_weight_matrix_velocity); d_weight_matrix_velocity = NULL; }
+    if (d_bias_vector_velocity != NULL) { cudaFree(d_bias_vector_velocity); d_bias_vector_velocity = NULL; }
 }
 
 void Layer::copyWeightBias(float* h_weight, float* h_bias) {
