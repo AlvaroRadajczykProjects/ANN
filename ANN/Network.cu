@@ -380,6 +380,8 @@ float* Network::trainGetCostFunctionAndCalculateLossFunction(int num_examples, i
 		if (num_examples % batch_size == 0) {
 			int num_elems_batch = batch_size * input_size;
 
+			cudaFree(d_input_train_pointers);
+			d_input_train_pointers = NULL;
 			d_input_train_pointers = input_train->generateDeviceRowsPointers(offset_id, number_networks, batch_ids);
 			forwardTrain(num_examples, batch_size, d_input_train_pointers);
 
@@ -445,6 +447,8 @@ float* Network::validationGetCostFunctionAndCalculateLossFunction(int num_exampl
 		if (num_examples % batch_size == 0) {
 			int num_elems_batch = batch_size * input_size;
 
+			cudaFree(d_input_validation_pointers);
+			d_input_validation_pointers = NULL;
 			d_input_validation_pointers = input_validation->generateDeviceRowsPointers(offset_id, number_networks, batch_ids);
 			forwardTrain(num_examples, batch_size, d_input_validation_pointers);
 
