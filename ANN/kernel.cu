@@ -33,7 +33,7 @@ func3_t d_func3 = 0;
 
 //first epoch number is 0
 float lrate_func(int epoch) {
-    return 0.0;
+    return 0.01;
 }
 
 int main() {
@@ -62,6 +62,7 @@ int main() {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    ///*
     int nrand = (rand() % 300) + 100;
     int nrand2 = (rand() % 300) + 100;
 
@@ -78,7 +79,7 @@ int main() {
         new Layer(256, ELU, dELU),
         new Layer(256, ELU, dELU),
         new Layer(256, Linear, dLinear),
-    }, MSE, dMSE);
+    }, MSE, dMSE, true);
 
     n->initWeightBiasValues();
 
@@ -97,40 +98,15 @@ int main() {
     n->copyInputOutputValidation(nrand2, input2, output2);
 
     //n->trainAllExamplesMaxBatch(lrate_func, NULL, 0, applyVGradSGD, 10000, 500, 0.1, 0.0001, 6);
-    n->trainAllExamplesMaxBatch(lrate_func, 3, new float[3]{ 0.9, 0.999, 0.00000001 }, applyVGradAdam, 20000, 500, 0.1, 0.000001, 10);
+    //n->trainAllExamplesMaxBatch(lrate_func, 3, new float[3]{ 0.9, 0.999, 0.00000001 }, applyVGradAdam, 20000, 500, 0.1, 0.000001, 10);
+    n->trainAllExamplesMaxBatch(lrate_func, 0, NULL, applyVGradSGD, 20000, 500, 0.1, 0.000001, 10);
 
     n->showForwardMatrices();
 
     n->finalizeForwardBackward();
 
     delete n;
-
-    /*
-    Network* n = new Network(256, 1, 3, new Layer * [3] {
-        new Layer(256, ELU, dELU),
-            new Layer(256, ELU, dELU),
-            new Layer(256, Linear, dLinear),
-        }, MSE, dMSE);
-
-    n->loadNetworkFromFile("network.data");
-
-    float* input = new float[256 * 144];
-    float* output = new float[256 * 144];
-
-    for (int i = 0; i < 256 * 144; i++) { input[i] = 10; output[i] = 0; }
-
-    n->initForwardTrain(144, 144, 32);
-
-    n->copyInputOutputTrain(144, input, output);
-    n->copyInputOutputValidation(144, input, output);
-
-    n->trainGetCostFunctionAndCalculateLossFunction(32, 0);
-    n->showForwardMatrices();
-
-    n->finalizeForwardBackward();
-
-    delete n;
-    */
+    //*/
 
     //PRUEBA FUNCIONAMIENTO FORWARD
 
@@ -141,7 +117,7 @@ int main() {
     Network* n = new Network(2, 2, 2, new Layer* [2]{
         l1,
         l2
-    }, MSE, dMSE);
+    }, MSE, dMSE, false);
 
     l1->copyWeightBias(new float[8] {-0.6057236802202783, -1.3743868186905905, 0.6057236802202786, 1.3743868186905905, -0.6057236802202783, -1.3743868186905905, 0.6057236802202786, 1.3743868186905905}, new float[4] {0.6057236802202781, -2.2751145817937323e-17, 0.6057236802202781, -2.2751145817937323e-17});
     l2->copyWeightBias(new float[4] {-1.6689619673839928, 1.463146879527966, -1.6689619673839928, 1.463146879527966}, new float[2] {1.0109297850315095, 1.0109297850315095});
